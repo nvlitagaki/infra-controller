@@ -112,6 +112,7 @@ func NewAPITenantStats(instancestatsmap map[string]int, vpcstatsmap map[string]i
 			Updating:    instancestatsmap[cdbm.InstanceStatusUpdating],
 			Registering: instancestatsmap[cdbm.InstanceStatusProvisioning],
 			Error:       instancestatsmap[cdbm.InstanceStatusError],
+			Rebooting:   instancestatsmap[cdbm.InstancePowerStatusRebooting],
 		},
 		Subnet: APISubnetStats{
 			Total:        subnetstatmap["total"],

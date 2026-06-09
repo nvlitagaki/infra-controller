@@ -720,6 +720,14 @@ func TestInstanceSQLDAO_GetCountByStatus(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, i4)
 
+	_, err = isd.Update(ctx, nil, InstanceUpdateInput{
+		InstanceID: i4.ID,
+		InstanceUpdateCommonInput: InstanceUpdateCommonInput{
+			PowerStatus: cutil.GetPtr(InstancePowerStatusRebooting),
+		},
+	})
+	assert.NoError(t, err)
+
 	i5, err := isd.Create(
 		ctx, nil,
 		InstanceCreateInput{
@@ -771,15 +779,16 @@ func TestInstanceSQLDAO_GetCountByStatus(t *testing.T) {
 			wantEmpty: false,
 			wantCount: 5,
 			wantStatusMap: map[string]int{
-				InstanceStatusPending:      2,
+				InstanceStatusPending:        2,
 				InstanceStatusProvisioning: 1,
 				InstanceStatusConfiguring:  0,
-				InstanceStatusReady:        1,
+				InstanceStatusReady:        0,
 				InstanceStatusUpdating:     0,
 				InstanceStatusRepairing:    1,
 				InstanceStatusTerminating:  0,
 				InstanceStatusError:        0,
-				"total":                    5,
+				InstancePowerStatusRebooting: 1,
+				"total":                      5,
 			},
 			reqTenant:          cutil.GetPtr(tenant1.ID),
 			verifyChildSpanner: true,
@@ -808,15 +817,16 @@ func TestInstanceSQLDAO_GetCountByStatus(t *testing.T) {
 			wantEmpty: false,
 			wantCount: 5,
 			wantStatusMap: map[string]int{
-				InstanceStatusPending:      2,
+				InstanceStatusPending:        2,
 				InstanceStatusProvisioning: 1,
 				InstanceStatusConfiguring:  0,
-				InstanceStatusReady:        1,
+				InstanceStatusReady:        0,
 				InstanceStatusUpdating:     0,
 				InstanceStatusRepairing:    1,
 				InstanceStatusTerminating:  0,
 				InstanceStatusError:        0,
-				"total":                    5,
+				InstancePowerStatusRebooting: 1,
+				"total":                      5,
 			},
 		},
 	}
@@ -849,6 +859,116 @@ func TestInstanceSQLDAO_GetCountByStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAggregatedInstanceStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		status      string
+		powerStatus *string
+		want        string
+	}{
+		{
+			name:        "non-ready status ignores power status",
+			status:      InstanceStatusPending,
+			powerStatus: cutil.GetPtr(InstancePowerStatusRebooting),
+			want:        InstanceStatusPending,
+		},
+		{
+			name:        "ready with rebooting power status",
+			status:      InstanceStatusReady,
+			powerStatus: cutil.GetPtr(InstancePowerStatusRebooting),
+			want:        InstancePowerStatusRebooting,
+		},
+		{
+			name:        "ready with error power status",
+			status:      InstanceStatusReady,
+			powerStatus: cutil.GetPtr(InstancePowerStatusError),
+			want:        InstancePowerStatusError,
+		},
+		{
+			name:        "ready with boot completed power status",
+			status:      InstanceStatusReady,
+			powerStatus: cutil.GetPtr(InstancePowerStatusBootCompleted),
+			want:        InstanceStatusReady,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := AggregatedInstanceStatus(tt.status, tt.powerStatus)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestInstanceSQLDAO_GetAll_AggregatedStatusFilter(t *testing.T) {
+	ctx := context.Background()
+	dbSession := testInstanceInitDB(t)
+	defer dbSession.Close()
+	testInstanceSetupSchema(t, dbSession)
+
+	ip := testInstanceBuildInfrastructureProvider(t, dbSession, "testIP")
+	site := testInstanceBuildSite(t, dbSession, ip, "testSite")
+	tenant := testInstanceBuildTenant(t, dbSession, "testTenant1")
+	vpc := testInstanceBuildVpc(t, dbSession, ip, site, tenant, "testVpc")
+	instanceType := testInstanceBuildInstanceType(t, dbSession, ip, "testInstanceType")
+	networkSecurityGroup := testInstanceBuildNetworkSecurityGroup(t, dbSession, tenant, site, "testNetworkSecurityGroup")
+	machine := testMachineBuildMachine(t, dbSession, ip.ID, site.ID, &instanceType.ID, cutil.GetPtr("mcTypeTest"))
+	operatingSystem := testInstanceBuildOperatingSystem(t, dbSession, "testOS")
+	user := testInstanceBuildUser(t, dbSession, "testUser")
+	isd := NewInstanceDAO(dbSession)
+
+	createInput := func(name, status string, powerStatus *string) *Instance {
+		t.Helper()
+		inst, err := isd.Create(ctx, nil, InstanceCreateInput{
+			Name:                     name,
+			TenantID:                 tenant.ID,
+			InfrastructureProviderID: ip.ID,
+			SiteID:                   site.ID,
+			InstanceTypeID:           &instanceType.ID,
+			NetworkSecurityGroupID:   &networkSecurityGroup.ID,
+			VpcID:                    vpc.ID,
+			MachineID:                &machine.ID,
+			OperatingSystemID:        cutil.GetPtr(operatingSystem.ID),
+			Status:                   status,
+			PowerStatus:              powerStatus,
+			CreatedBy:                user.ID,
+		})
+		assert.NoError(t, err)
+		return inst
+	}
+
+	rebootingInstance := createInput("rebooting-instance", InstanceStatusReady, cutil.GetPtr(InstancePowerStatusRebooting))
+	readyInstance := createInput("ready-instance", InstanceStatusReady, cutil.GetPtr(InstancePowerStatusBootCompleted))
+	powerErrorInstance := createInput("power-error-instance", InstanceStatusReady, cutil.GetPtr(InstancePowerStatusError))
+	lifecycleErrorInstance := createInput("lifecycle-error-instance", InstanceStatusError, nil)
+
+	rebootingMatches, rebootingTotal, err := isd.GetAll(ctx, nil, InstanceFilterInput{
+		TenantIDs: []uuid.UUID{tenant.ID},
+		Statuses:  []string{InstancePowerStatusRebooting},
+	}, paginator.PageInput{Limit: cutil.GetPtr(paginator.TotalLimit)}, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, rebootingTotal)
+	assert.Len(t, rebootingMatches, 1)
+	assert.Equal(t, rebootingInstance.ID, rebootingMatches[0].ID)
+
+	readyMatches, readyTotal, err := isd.GetAll(ctx, nil, InstanceFilterInput{
+		TenantIDs: []uuid.UUID{tenant.ID},
+		Statuses:  []string{InstanceStatusReady},
+	}, paginator.PageInput{Limit: cutil.GetPtr(paginator.TotalLimit)}, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, readyTotal)
+	assert.Equal(t, readyInstance.ID, readyMatches[0].ID)
+
+	errorMatches, errorTotal, err := isd.GetAll(ctx, nil, InstanceFilterInput{
+		TenantIDs: []uuid.UUID{tenant.ID},
+		Statuses:  []string{InstanceStatusError},
+	}, paginator.PageInput{Limit: cutil.GetPtr(paginator.TotalLimit)}, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, errorTotal)
+	errorIDs := []uuid.UUID{errorMatches[0].ID, errorMatches[1].ID}
+	assert.Contains(t, errorIDs, powerErrorInstance.ID)
+	assert.Contains(t, errorIDs, lifecycleErrorInstance.ID)
 }
 
 func TestInstanceSQLDAO_GetAll(t *testing.T) {

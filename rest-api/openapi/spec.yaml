@@ -12940,6 +12940,7 @@ components:
             pending: 2
             provisioning: 1
             ready: 8
+            rebooting: 1
             terminating: 2
             error: 1
           vpc:
@@ -12972,6 +12973,7 @@ components:
           pending: 2
           provisioning: 1
           ready: 8
+          rebooting: 1
           terminating: 2
           error: 1
       properties:
@@ -12982,6 +12984,8 @@ components:
         provisioning:
           type: integer
         ready:
+          type: integer
+        rebooting:
           type: integer
         terminating:
           type: integer

@@ -179,6 +179,38 @@ type Instance struct {
 	MCType string `bun:"mc_type,scanonly"`
 }
 
+// AggregatedInstanceStatus returns the status reported by the API by
+// combining lifecycle status with power status when the Instance is Ready.
+func AggregatedInstanceStatus(status string, powerStatus *string) string {
+	agStatus := status
+
+	if powerStatus == nil {
+		return agStatus
+	}
+
+	if status != InstanceStatusReady {
+		return agStatus
+	}
+
+	switch *powerStatus {
+	case InstancePowerStatusRebooting:
+		agStatus = InstancePowerStatusRebooting
+	case InstancePowerStatusError:
+		agStatus = InstancePowerStatusError
+	}
+
+	return agStatus
+}
+
+func instanceAggregatedStatusSQL() string {
+	return fmt.Sprintf(
+		"CASE WHEN i.status = '%s' AND i.power_status IN ('%s', '%s') THEN i.power_status ELSE i.status END",
+		InstanceStatusReady,
+		InstancePowerStatusRebooting,
+		InstancePowerStatusError,
+	)
+}
+
 // GetSiteID returns the Instance ID to use when communicating with the
 // Site: ControllerInstanceID when present, otherwise the Instance's own
 // ID. The Site treats both as opaque identifiers.
@@ -452,22 +484,28 @@ func (isd InstanceSQLDAO) GetCountByStatus(ctx context.Context, tx *db.Tx, tenan
 		}
 	}
 
-	err := query.Column("i.status").ColumnExpr("COUNT(*) AS total_count").GroupExpr("i.status").Scan(ctx, &statusQueryResults)
+	aggregatedStatusExpr := instanceAggregatedStatusSQL()
+	err := query.
+		ColumnExpr(aggregatedStatusExpr+" AS status").
+		ColumnExpr("COUNT(*) AS total_count").
+		GroupExpr(aggregatedStatusExpr).
+		Scan(ctx, &statusQueryResults)
 	if err != nil {
 		return nil, err
 	}
 
 	// creare results map by holding key as status value with total count
 	results := map[string]int{
-		"total":                    0,
-		InstanceStatusPending:      0,
-		InstanceStatusProvisioning: 0,
-		InstanceStatusConfiguring:  0,
-		InstanceStatusReady:        0,
-		InstanceStatusUpdating:     0,
-		InstanceStatusRepairing:    0,
-		InstanceStatusTerminating:  0,
-		InstanceStatusError:        0,
+		"total":                      0,
+		InstanceStatusPending:        0,
+		InstanceStatusProvisioning:   0,
+		InstanceStatusConfiguring:    0,
+		InstanceStatusReady:          0,
+		InstanceStatusUpdating:       0,
+		InstanceStatusRepairing:      0,
+		InstanceStatusTerminating:    0,
+		InstanceStatusError:          0,
+		InstancePowerStatusRebooting: 0,
 	}
 	if len(statusQueryResults) > 0 {
 		for _, statusMap := range statusQueryResults {
@@ -581,7 +619,7 @@ func (isd InstanceSQLDAO) setQueryWithFilter(filter InstanceFilterInput, query *
 	}
 
 	if filter.Statuses != nil {
-		query = query.Where("i.status IN (?)", bun.In(filter.Statuses))
+		query = query.Where("("+instanceAggregatedStatusSQL()+") IN (?)", bun.In(filter.Statuses))
 		if instanceDAOSpan != nil {
 			isd.tracerSpan.SetAttribute(instanceDAOSpan, "statuses", filter.Statuses)
 		}

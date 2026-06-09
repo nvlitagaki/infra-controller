@@ -1829,7 +1829,7 @@ func NewAPIInstance(dbinst *cdbm.Instance, dbSite *cdbm.Site, dbiss []cdbm.Inter
 		apiInstance.TpmEkCertificate = dbinst.TpmEkCertificate
 	}
 
-	apiInstance.Status = getAggregatedInstanceStatus(dbinst.Status, dbinst.PowerStatus)
+	apiInstance.Status = cdbm.AggregatedInstanceStatus(dbinst.Status, dbinst.PowerStatus)
 
 	secondaryVpcIDs := goset.NewSet[string]()
 
@@ -1938,26 +1938,6 @@ type APIInstanceStats struct {
 	Registering int `json:"registering"`
 	// Error is the total number of error Instances
 	Error int `json:"error"`
-}
-
-// getAggregatedInstanceStatus returns the aggregated status of the Instance by consulting the Instance status and Instance power status
-func getAggregatedInstanceStatus(status string, powerStatus *string) string {
-	agStatus := status
-
-	if powerStatus == nil {
-		return agStatus
-	}
-
-	if status != cdbm.InstanceStatusReady {
-		return agStatus
-	}
-
-	switch *powerStatus {
-	case cdbm.InstancePowerStatusRebooting:
-		agStatus = cdbm.InstancePowerStatusRebooting
-	case cdbm.InstancePowerStatusError:
-		agStatus = cdbm.InstancePowerStatusError
-	}
-
-	return agStatus
+	// Rebooting is the total number of Instances that are rebooting
+	Rebooting int `json:"rebooting"`
 }
