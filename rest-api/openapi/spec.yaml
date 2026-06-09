@@ -12969,13 +12969,17 @@ components:
       type: object
       description: Describes count of Instances in various statuses
       examples:
-        - total: 12
+        - total: 18
           pending: 2
           provisioning: 1
+          configuring: 2
           ready: 8
           rebooting: 1
+          repairing: 1
           terminating: 2
           error: 1
+          updating: 0
+          unknown: 0
       properties:
         total:
           type: integer
@@ -12983,13 +12987,21 @@ components:
           type: integer
         provisioning:
           type: integer
+        configuring:
+          type: integer
         ready:
           type: integer
         rebooting:
           type: integer
+        repairing:
+          type: integer
         terminating:
           type: integer
         error:
+          type: integer
+        updating:
+          type: integer
+        unknown:
           type: integer
     VpcCountByStatus:
       title: VpcCountByStatus

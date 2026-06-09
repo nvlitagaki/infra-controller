@@ -1921,23 +1921,3 @@ func NewAPIInstanceSummary(dbist *cdbm.Instance) *APIInstanceSummary {
 
 	return &ins
 }
-
-// APIInstanceStats is a data structure to capture information about Instancestats at the API layer
-type APIInstanceStats struct {
-	// Total is the total number of the Instances
-	Total int `json:"total"`
-	// Pending is the total number of pending Instances
-	Pending int `json:"pending"`
-	// Terminating is the total number of provisioning InstanceS
-	Terminating int `json:"terminating"`
-	// Ready is the total number of ready Instances
-	Ready int `json:"ready"`
-	// Updating is the total number of Instances receiving system updates
-	Updating int `json:"updating"`
-	// Registering is the total number of registering Instances
-	Registering int `json:"registering"`
-	// Error is the total number of error Instances
-	Error int `json:"error"`
-	// Rebooting is the total number of Instances that are rebooting
-	Rebooting int `json:"rebooting"`
-}

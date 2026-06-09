@@ -762,7 +762,7 @@ func TestInstanceSQLDAO_GetCountByStatus(t *testing.T) {
 		wantErr            error
 		wantEmpty          bool
 		wantCount          int
-		wantStatusMap      map[string]int
+		wantStatusMap      InstanceStatusCounts
 		reqTenant          *uuid.UUID
 		reqSite            *uuid.UUID
 		verifyChildSpanner bool
@@ -778,17 +778,12 @@ func TestInstanceSQLDAO_GetCountByStatus(t *testing.T) {
 			wantErr:   nil,
 			wantEmpty: false,
 			wantCount: 5,
-			wantStatusMap: map[string]int{
-				InstanceStatusPending:        2,
-				InstanceStatusProvisioning: 1,
-				InstanceStatusConfiguring:  0,
-				InstanceStatusReady:        0,
-				InstanceStatusUpdating:     0,
-				InstanceStatusRepairing:    1,
-				InstanceStatusTerminating:  0,
-				InstanceStatusError:        0,
-				InstancePowerStatusRebooting: 1,
-				"total":                      5,
+			wantStatusMap: InstanceStatusCounts{
+				Total:        5,
+				Pending:      2,
+				Provisioning: 1,
+				Repairing:    1,
+				Rebooting:    1,
 			},
 			reqTenant:          cutil.GetPtr(tenant1.ID),
 			verifyChildSpanner: true,
@@ -816,17 +811,12 @@ func TestInstanceSQLDAO_GetCountByStatus(t *testing.T) {
 			wantErr:   nil,
 			wantEmpty: false,
 			wantCount: 5,
-			wantStatusMap: map[string]int{
-				InstanceStatusPending:        2,
-				InstanceStatusProvisioning: 1,
-				InstanceStatusConfiguring:  0,
-				InstanceStatusReady:        0,
-				InstanceStatusUpdating:     0,
-				InstanceStatusRepairing:    1,
-				InstanceStatusTerminating:  0,
-				InstanceStatusError:        0,
-				InstancePowerStatusRebooting: 1,
-				"total":                      5,
+			wantStatusMap: InstanceStatusCounts{
+				Total:        5,
+				Pending:      2,
+				Provisioning: 1,
+				Repairing:    1,
+				Rebooting:    1,
 			},
 		},
 	}
@@ -841,15 +831,13 @@ func TestInstanceSQLDAO_GetCountByStatus(t *testing.T) {
 				return
 			}
 			if tt.wantEmpty {
-				assert.EqualValues(t, got["total"], 0)
+				assert.EqualValues(t, got.Total, 0)
 			}
 			if err == nil && !tt.wantEmpty {
-				assert.EqualValues(t, tt.wantStatusMap, got)
-				if len(got) > 0 {
-					assert.EqualValues(t, got[InstanceStatusPending], 2)
-					assert.EqualValues(t, got[InstanceStatusRepairing], 1)
-					assert.EqualValues(t, got["total"], tt.wantCount)
-				}
+				assert.Equal(t, tt.wantStatusMap, got)
+				assert.EqualValues(t, got.Pending, 2)
+				assert.EqualValues(t, got.Repairing, 1)
+				assert.EqualValues(t, got.Total, tt.wantCount)
 			}
 			if tt.verifyChildSpanner {
 				span := otrace.SpanFromContext(ctx)
