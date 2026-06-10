@@ -314,8 +314,8 @@ func TestDomainSQLDAO_GetAll(t *testing.T) {
 			desc: "GetAll with multiple filters returns objects",
 			filter: DomainFilterInput{
 				Hostname:           cutil.GetPtr("test1.com"),
-				Org:                  cutil.GetPtr("testOrg1"),
-				ControllerDomainID:   &controllerDomainID,
+				Org:                cutil.GetPtr("testOrg1"),
+				ControllerDomainID: &controllerDomainID,
 			},
 			expectedCnt:   1,
 			expectedError: false,

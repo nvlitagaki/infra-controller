@@ -665,7 +665,7 @@ func GetAllInstanceTypeAllocationStats(ctx context.Context, dbSession *cdb.Sessi
 	acDAO := cdbm.NewAllocationConstraintDAO(dbSession)
 	acss, _, err := acDAO.GetAll(ctx, nil, cdbm.AllocationConstraintFilterInput{
 		AllocationIDs:   aids,
-		ResourceType:  cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
+		ResourceType:    cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
 		ResourceTypeIDs: instanceTypeIDs,
 	}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
 	if err != nil {
