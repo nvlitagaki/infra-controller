@@ -1907,7 +1907,7 @@ func NewAPIInstanceSummary(dbist *cdbm.Instance) *APIInstanceSummary {
 		Name:                     dbist.Name,
 		InfrastructureProviderID: dbist.InfrastructureProviderID.String(),
 		SiteID:                   dbist.SiteID.String(),
-		Status:                   dbist.Status,
+		Status:                   cdbm.AggregatedInstanceStatus(dbist.Status, dbist.PowerStatus),
 	}
 
 	// Check if the instance type is set.  If so, use it.  If not set, it's a targeted Instance.
