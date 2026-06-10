@@ -304,7 +304,11 @@ func TestBuildAllocationConstraint(t *testing.T, dbSession *db.Session, al *Allo
 	}
 
 	acDAO := NewAllocationConstraintDAO(dbSession)
-	ac, err := acDAO.CreateFromParams(context.Background(), nil, al.ID, AllocationResourceTypeInstanceType, resourceID, AllocationConstraintTypeReserved, constraintValue, nil, user.ID)
+	ac, err := acDAO.Create(context.Background(), nil, AllocationConstraintCreateInput{
+		AllocationID: al.ID, ResourceType: AllocationResourceTypeInstanceType,
+		ResourceTypeID: resourceID, ConstraintType: AllocationConstraintTypeReserved,
+		ConstraintValue: constraintValue, CreatedBy: user.ID,
+	})
 	assert.Nil(t, err)
 
 	return ac
