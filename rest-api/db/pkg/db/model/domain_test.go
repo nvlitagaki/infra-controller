@@ -81,6 +81,7 @@ func TestDomainSQLDAO_Create(t *testing.T) {
 					Org:                "testOrg",
 					ControllerDomainID: &controllerDomainID,
 					Status:             DomainStatusPending,
+					CreatedBy:          user.ID,
 				},
 			},
 			expectError:        false,

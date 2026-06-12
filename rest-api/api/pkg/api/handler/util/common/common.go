@@ -212,19 +212,18 @@ func GetSSHKeyGroupFromIDString(ctx context.Context, tx *cdb.Tx, sshkeyGroupID s
 // GetAllocationConstraintsForInstanceType gets allocation constraints for instance type allocation
 func GetAllocationConstraintsForInstanceType(ctx context.Context, tx *cdb.Tx, dbSession *cdb.Session, tenantID uuid.UUID, instancetype *cdbm.InstanceType, allocations []cdbm.Allocation) ([]cdbm.AllocationConstraint, error) {
 	alcsDAO := cdbm.NewAllocationConstraintDAO(dbSession)
-	var alconstraints []cdbm.AllocationConstraint
-	for _, ac := range allocations {
-		// improve this query by adding allocation slices in allocation constraints model
-		alcoss, _, err := alcsDAO.GetAll(ctx, tx, cdbm.AllocationConstraintFilterInput{
-			AllocationIDs:   []uuid.UUID{ac.ID},
-			ResourceType:    cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
-			ResourceTypeIDs: []uuid.UUID{instancetype.ID},
-			ConstraintType:  cutil.GetPtr(cdbm.AllocationConstraintTypeReserved),
-		}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
-		if err != nil {
-			return nil, err
-		}
-		alconstraints = append(alconstraints, alcoss...)
+	allocationIDs := make([]uuid.UUID, 0, len(allocations))
+	for _, allocation := range allocations {
+		allocationIDs = append(allocationIDs, allocation.ID)
+	}
+	alconstraints, _, err := alcsDAO.GetAll(ctx, tx, cdbm.AllocationConstraintFilterInput{
+		AllocationIDs:   allocationIDs,
+		ResourceType:    cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
+		ResourceTypeIDs: []uuid.UUID{instancetype.ID},
+		ConstraintType:  cutil.GetPtr(cdbm.AllocationConstraintTypeReserved),
+	}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
+	if err != nil {
+		return nil, err
 	}
 	if len(alconstraints) == 0 {
 		return nil, ErrAllocationConstraintNotFound
@@ -466,13 +465,16 @@ func GetSiteMachineCountStats(ctx context.Context, tx *cdb.Tx, dbSession *cdb.Se
 	}
 
 	// Get all Allocation Constraints for Allocation IDs
-	acDAO := cdbm.NewAllocationConstraintDAO(dbSession)
-	acs, _, err := acDAO.GetAll(ctx, tx, cdbm.AllocationConstraintFilterInput{
-		AllocationIDs: allocationIDs,
-		ResourceType:  cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
-	}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
-	if err != nil {
-		return nil, err
+	var acs []cdbm.AllocationConstraint
+	if len(allocationIDs) > 0 {
+		acDAO := cdbm.NewAllocationConstraintDAO(dbSession)
+		acs, _, err = acDAO.GetAll(ctx, tx, cdbm.AllocationConstraintFilterInput{
+			AllocationIDs: allocationIDs,
+			ResourceType:  cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
+		}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	totalAllocationBySite := map[uuid.UUID]int{}
@@ -568,6 +570,9 @@ func GetAllAllocationConstraintsForInstanceType(ctx context.Context, tx *cdb.Tx,
 	var allocIDs []uuid.UUID
 	for _, alloc := range allocs {
 		allocIDs = append(allocIDs, alloc.ID)
+	}
+	if len(allocIDs) == 0 {
+		return []cdbm.AllocationConstraint{}, 0, nil
 	}
 	acs, tot, serr := acDAO.GetAll(ctx, tx, cdbm.AllocationConstraintFilterInput{
 		AllocationIDs:   allocIDs,
@@ -666,14 +671,17 @@ func GetAllInstanceTypeAllocationStats(ctx context.Context, dbSession *cdb.Sessi
 	}
 
 	// Get all Allocation Constraints for the Instance Type IDs and Allocation IDs
-	acDAO := cdbm.NewAllocationConstraintDAO(dbSession)
-	acss, _, err := acDAO.GetAll(ctx, nil, cdbm.AllocationConstraintFilterInput{
-		AllocationIDs:   aids,
-		ResourceType:    cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
-		ResourceTypeIDs: instanceTypeIDs,
-	}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
-	if err != nil {
-		return nil, cutil.NewAPIError(http.StatusInternalServerError, "Error retrieving Allocations for Instance Type, DB error", nil)
+	var acss []cdbm.AllocationConstraint
+	if len(aids) > 0 {
+		acDAO := cdbm.NewAllocationConstraintDAO(dbSession)
+		acss, _, err = acDAO.GetAll(ctx, nil, cdbm.AllocationConstraintFilterInput{
+			AllocationIDs:   aids,
+			ResourceType:    cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
+			ResourceTypeIDs: instanceTypeIDs,
+		}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
+		if err != nil {
+			return nil, cutil.NewAPIError(http.StatusInternalServerError, "Error retrieving Allocations for Instance Type, DB error", nil)
+		}
 	}
 
 	// Get all Machines for the Instance Type IDs

@@ -253,7 +253,7 @@ func (acd AllocationConstraintSQLDAO) GetAll(ctx context.Context, tx *db.Tx,
 
 	query := db.GetIDB(tx, acd.dbSession).NewSelect().Model(&acs)
 
-	if filter.AllocationIDs != nil {
+	if len(filter.AllocationIDs) > 0 {
 		if len(filter.AllocationIDs) == 1 {
 			query = query.Where("ac.allocation_id = ?", filter.AllocationIDs[0])
 		} else {
@@ -273,7 +273,7 @@ func (acd AllocationConstraintSQLDAO) GetAll(ctx context.Context, tx *db.Tx,
 		}
 	}
 
-	if filter.ResourceTypeIDs != nil {
+	if len(filter.ResourceTypeIDs) > 0 {
 		if len(filter.ResourceTypeIDs) == 1 {
 			query = query.Where("ac.resource_type_id = ?", filter.ResourceTypeIDs[0])
 		} else {

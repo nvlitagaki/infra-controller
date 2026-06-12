@@ -297,15 +297,17 @@ func TestBuildAllocation(t *testing.T, dbSession *db.Session, name string, st *S
 // TestBuildAllocationConstraint creates a test Allocation Constraint of Instance Type
 func TestBuildAllocationConstraint(t *testing.T, dbSession *db.Session, al *Allocation, it *InstanceType, ipb *IPBlock, constraintValue int, user *User) *AllocationConstraint {
 	var resourceID uuid.UUID
+	resourceType := AllocationResourceTypeInstanceType
 	if it != nil {
 		resourceID = it.ID
 	} else if ipb != nil {
 		resourceID = ipb.ID
+		resourceType = AllocationResourceTypeIPBlock
 	}
 
 	acDAO := NewAllocationConstraintDAO(dbSession)
 	ac, err := acDAO.Create(context.Background(), nil, AllocationConstraintCreateInput{
-		AllocationID: al.ID, ResourceType: AllocationResourceTypeInstanceType,
+		AllocationID: al.ID, ResourceType: resourceType,
 		ResourceTypeID: resourceID, ConstraintType: AllocationConstraintTypeReserved,
 		ConstraintValue: constraintValue, CreatedBy: user.ID,
 	})

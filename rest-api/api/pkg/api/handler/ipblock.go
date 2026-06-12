@@ -638,6 +638,7 @@ func (gadipbh GetAllDerivedIPBlockHandler) Handle(c echo.Context) error {
 	// Get allocation constraints by resourcetype ID (parent IPBlock)
 	acDAO := cdbm.NewAllocationConstraintDAO(gadipbh.dbSession)
 	acs, _, err := acDAO.GetAll(ctx, nil, cdbm.AllocationConstraintFilterInput{
+		ResourceType:    cutil.GetPtr(cdbm.AllocationResourceTypeIPBlock),
 		ResourceTypeIDs: []uuid.UUID{ipb.ID},
 	}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
 	if err != nil {

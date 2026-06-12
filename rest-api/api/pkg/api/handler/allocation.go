@@ -753,11 +753,14 @@ func (gaah GetAllAllocationHandler) Handle(c echo.Context) error {
 	apials := []*model.APIAllocation{}
 
 	// Get allocation constraints based on allocation filter by resource type
-	acDAO := cdbm.NewAllocationConstraintDAO(gaah.dbSession)
-	alcs, _, err := acDAO.GetAll(ctx, nil, cdbm.AllocationConstraintFilterInput{AllocationIDs: aids}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
-	if err != nil {
-		logger.Error().Err(err).Msg("error retrieving Allocation Constraints for Allocations from DB")
-		return cutil.NewAPIErrorResponse(c, http.StatusInternalServerError, "Failed to populate Constraints for Allocations", nil)
+	var alcs []cdbm.AllocationConstraint
+	if len(aids) > 0 {
+		acDAO := cdbm.NewAllocationConstraintDAO(gaah.dbSession)
+		alcs, _, err = acDAO.GetAll(ctx, nil, cdbm.AllocationConstraintFilterInput{AllocationIDs: aids}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
+		if err != nil {
+			logger.Error().Err(err).Msg("error retrieving Allocation Constraints for Allocations from DB")
+			return cutil.NewAPIErrorResponse(c, http.StatusInternalServerError, "Failed to populate Constraints for Allocations", nil)
+		}
 	}
 
 	// Get Resource Type info
