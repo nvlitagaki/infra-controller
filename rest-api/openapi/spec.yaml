@@ -13122,7 +13122,7 @@ components:
       type: object
       description: Provide operational stats for Tenant
       examples:
-          instance:
+        - instance:
             total: 18
             pending: 2
             provisioning: 1
