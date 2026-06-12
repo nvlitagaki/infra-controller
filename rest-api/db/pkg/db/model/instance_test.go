@@ -904,9 +904,9 @@ func TestInstanceCountByStatus_FromQueryResults(t *testing.T) {
 				{Status: InstancePowerStatusRebooting, TotalCount: 1},
 			},
 			want: InstanceCountByStatus{
-				Total:   8,
-				Pending: 2,
-				Ready:   5,
+				Total:     8,
+				Pending:   2,
+				Ready:     5,
 				Rebooting: 1,
 			},
 		},
