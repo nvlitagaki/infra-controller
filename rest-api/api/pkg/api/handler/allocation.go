@@ -362,9 +362,13 @@ func (cah CreateAllocationHandler) Handle(c echo.Context) error {
 		imAcUpd := []cdbm.AllocationConstraint{}
 		for _, ac := range dbacs {
 			retac, serr := acDAO.Create(ctx, tx, cdbm.AllocationConstraintCreateInput{
-				AllocationID: a.ID, ResourceType: ac.ResourceType, ResourceTypeID: ac.ResourceTypeID,
-				ConstraintType: ac.ConstraintType, ConstraintValue: ac.ConstraintValue,
-				DerivedResourceID: ac.DerivedResourceID, CreatedBy: dbUser.ID,
+				AllocationID:      a.ID,
+				ResourceType:      ac.ResourceType,
+				ResourceTypeID:    ac.ResourceTypeID,
+				ConstraintType:    ac.ConstraintType,
+				ConstraintValue:   ac.ConstraintValue,
+				DerivedResourceID: ac.DerivedResourceID,
+				CreatedBy:         dbUser.ID,
 			})
 			if serr != nil {
 				logger.Error().Err(serr).Msg("error creating Allocation Constraint DB entry")
