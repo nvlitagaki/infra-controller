@@ -1595,7 +1595,7 @@ async fn test_fallback_dpu_serial(pool: PgPool) -> Result<(), Box<dyn std::error
         assert!(
             <Vec<Machine> as AsRef<Vec<Machine>>>::as_ref(&machines)
                 .iter()
-                .any(|x| { x.bmc_info.ip.clone().unwrap_or_default() == bmc_ip })
+                .any(|x| { x.bmc_info.ip.is_some_and(|ip| ip.to_string() == bmc_ip) })
         );
     }
     Ok(())
@@ -2317,12 +2317,10 @@ async fn test_delete_explored_endpoint(pool: PgPool) -> Result<(), Box<dyn std::
 
     // Verify both endpoints still exist
     let mut txn = env.pool.begin().await?;
-    let host_endpoints =
-        db::explored_endpoints::find_all_by_ip(IpAddr::from_str(host_ip)?, &mut txn).await?;
+    let host_endpoints = db::explored_endpoints::find_all_by_ip(*host_ip, &mut txn).await?;
     assert_eq!(host_endpoints.len(), 1);
 
-    let dpu_endpoints =
-        db::explored_endpoints::find_all_by_ip(IpAddr::from_str(dpu_ip)?, &mut txn).await?;
+    let dpu_endpoints = db::explored_endpoints::find_all_by_ip(*dpu_ip, &mut txn).await?;
     assert_eq!(dpu_endpoints.len(), 1);
     txn.commit().await?;
 
@@ -2773,6 +2771,92 @@ async fn test_site_explorer_auto_corrects_nic_mode_per_expected_machine(
     assert!(
         calls.iter().any(|(_, mode)| *mode == NicMode::Nic),
         "expected at least one set_nic_mode(Nic) call triggered by the operator's NicMode declaration; calls so far: {calls:?}"
+    );
+
+    Ok(())
+}
+
+/// A queued `set_nic_mode` only takes effect after a host power cycle, and
+/// site-explorer drives that power cycle itself for every vendor -- the
+/// Redfish `ComputerSystem.Reset` action is standard across BMCs. This is
+/// the non-Dell guard for that behavior: a Lenovo host whose DPU needs the
+/// mode correction gets an automatic `PowerCycle` on its host BMC in the
+/// same pass that issued `set_nic_mode`, rather than parking on a manual
+/// power cycle.
+#[sqlx_test]
+async fn test_site_explorer_power_cycles_non_dell_host_to_apply_nic_mode(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use model::expected_machine::{DpuMode, ExpectedMachine, ExpectedMachineData};
+    use model::site_explorer::NicMode;
+
+    let env = common::api_fixtures::create_test_env(pool).await;
+
+    // DPU hardware reports DPU mode; the operator-declared NicMode override
+    // is what forces the correction (and therefore the power cycle).
+    let dpu_config = DpuConfig {
+        nic_mode: Some(NicMode::Dpu),
+        ..DpuConfig::default()
+    };
+    let mock_host = ManagedHostConfig {
+        dpus: vec![dpu_config],
+        vendor: Some(bmc_vendor::BMCVendor::Lenovo),
+        ..ManagedHostConfig::default()
+    };
+    let host_bmc_mac = mock_host.bmc_mac_address;
+
+    let mut txn = env.pool.begin().await?;
+    db::expected_machine::create(
+        &mut txn,
+        ExpectedMachine {
+            id: None,
+            bmc_mac_address: host_bmc_mac,
+            data: ExpectedMachineData {
+                bmc_username: "ADMIN".to_string(),
+                bmc_password: "PASS".to_string(),
+                serial_number: "EM-866-NIC-POWERCYCLE".to_string(),
+                metadata: model::metadata::Metadata::new_with_default_name(),
+                dpu_mode: DpuMode::NicMode,
+                ..Default::default()
+            },
+        },
+    )
+    .await?;
+    txn.commit().await?;
+
+    common::api_fixtures::site_explorer::MockExploredHost::new(&env, mock_host)
+        .discover_dhcp_host_bmc(|_, _| Ok(()))
+        .await?
+        .discover_dhcp_dpu_bmc(0, |_, _| Ok(()))
+        .await?
+        .insert_site_exploration_results()?
+        // First iteration: initial endpoint exploration.
+        .run_site_explorer_iteration()
+        .await
+        .mark_preingestion_complete()
+        .await?
+        // Second iteration: the matching loop issues `set_nic_mode` and,
+        // with the DPU now needing reconfiguration, power-cycles the host
+        // so the queued mode change applies.
+        .run_site_explorer_iteration()
+        .await;
+
+    let nic_mode_calls = env.endpoint_explorer.set_nic_mode_calls.lock().unwrap();
+    assert!(
+        nic_mode_calls.iter().any(|(_, mode)| *mode == NicMode::Nic),
+        "expected set_nic_mode(Nic) before the power cycle; calls so far: {nic_mode_calls:?}"
+    );
+
+    let power_calls = env
+        .endpoint_explorer
+        .redfish_power_control_calls
+        .lock()
+        .unwrap();
+    assert!(
+        power_calls
+            .iter()
+            .any(|(_, action)| matches!(action, libredfish::SystemPowerControl::PowerCycle)),
+        "expected an automatic host PowerCycle on the non-Dell (Lenovo) host to apply the queued NIC mode change; power calls so far: {power_calls:?}"
     );
 
     Ok(())
