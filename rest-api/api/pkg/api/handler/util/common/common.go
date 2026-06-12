@@ -212,18 +212,19 @@ func GetSSHKeyGroupFromIDString(ctx context.Context, tx *cdb.Tx, sshkeyGroupID s
 // GetAllocationConstraintsForInstanceType gets allocation constraints for instance type allocation
 func GetAllocationConstraintsForInstanceType(ctx context.Context, tx *cdb.Tx, dbSession *cdb.Session, tenantID uuid.UUID, instancetype *cdbm.InstanceType, allocations []cdbm.Allocation) ([]cdbm.AllocationConstraint, error) {
 	alcsDAO := cdbm.NewAllocationConstraintDAO(dbSession)
-	allocationIDs := make([]uuid.UUID, 0, len(allocations))
-	for _, allocation := range allocations {
-		allocationIDs = append(allocationIDs, allocation.ID)
-	}
-	alconstraints, _, err := alcsDAO.GetAll(ctx, tx, cdbm.AllocationConstraintFilterInput{
-		AllocationIDs:   allocationIDs,
-		ResourceType:    cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
-		ResourceTypeIDs: []uuid.UUID{instancetype.ID},
-		ConstraintType:  cutil.GetPtr(cdbm.AllocationConstraintTypeReserved),
-	}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
-	if err != nil {
-		return nil, err
+	var alconstraints []cdbm.AllocationConstraint
+	for _, ac := range allocations {
+		// improve this query by adding allocation slices in allocation constraints model
+		alcoss, _, err := alcsDAO.GetAll(ctx, tx, cdbm.AllocationConstraintFilterInput{
+			AllocationIDs:   []uuid.UUID{ac.ID},
+			ResourceType:    cutil.GetPtr(cdbm.AllocationResourceTypeInstanceType),
+			ResourceTypeIDs: []uuid.UUID{instancetype.ID},
+			ConstraintType:  cutil.GetPtr(cdbm.AllocationConstraintTypeReserved),
+		}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
+		if err != nil {
+			return nil, err
+		}
+		alconstraints = append(alconstraints, alcoss...)
 	}
 	if len(alconstraints) == 0 {
 		return nil, ErrAllocationConstraintNotFound
