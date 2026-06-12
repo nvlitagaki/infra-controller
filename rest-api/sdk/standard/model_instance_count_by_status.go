@@ -4,7 +4,7 @@
 /*
 NVIDIA Infra Controller REST API
 
-NVIDIA Infra Controller REST API allows users to create and manage resources e.g. VPC, Subnets, Instances across all connected NVIDIA Infra Controller datacenters, also referred to as Sites.
+NVIDIA Infra Controller REST API allows users to create and manage resources, e.g., VPCs, Subnets, and Instances, across all connected NVIDIA Infra Controller datacenters, also referred to as Sites.
 
 API version: 1.6.0
 */
@@ -22,17 +22,26 @@ var _ MappedNullable = &InstanceCountByStatus{}
 
 // InstanceCountByStatus Describes count of Instances in various statuses
 type InstanceCountByStatus struct {
-	Total        *int32 `json:"total,omitempty"`
-	Pending      *int32 `json:"pending,omitempty"`
+	// Total number of Instances
+	Total *int32 `json:"total,omitempty"`
+	// Number of Instances in Pending status
+	Pending *int32 `json:"pending,omitempty"`
+	// Number of Instances in Provisioning status
 	Provisioning *int32 `json:"provisioning,omitempty"`
-	Configuring  *int32 `json:"configuring,omitempty"`
-	Ready        *int32 `json:"ready,omitempty"`
-	Rebooting    *int32 `json:"rebooting,omitempty"`
-	Repairing    *int32 `json:"repairing,omitempty"`
-	Terminating  *int32 `json:"terminating,omitempty"`
-	Error        *int32 `json:"error,omitempty"`
-	Updating     *int32 `json:"updating,omitempty"`
-	Unknown      *int32 `json:"unknown,omitempty"`
+	// Number of Instances in Ready status
+	Ready *int32 `json:"ready,omitempty"`
+	// Number of Instances in Rebooting status
+	Rebooting *int32 `json:"rebooting,omitempty"`
+	// Number of Instances in Repairing status
+	Repairing *int32 `json:"repairing,omitempty"`
+	// Number of Instances in Terminating status
+	Terminating *int32 `json:"terminating,omitempty"`
+	// Number of Instances in Error status
+	Error *int32 `json:"error,omitempty"`
+	// Number of Instances in Updating status
+	Updating *int32 `json:"updating,omitempty"`
+	// Number of Instances in Unknown status
+	Unknown *int32 `json:"unknown,omitempty"`
 }
 
 // NewInstanceCountByStatus instantiates a new InstanceCountByStatus object
@@ -146,38 +155,6 @@ func (o *InstanceCountByStatus) HasProvisioning() bool {
 // SetProvisioning gets a reference to the given int32 and assigns it to the Provisioning field.
 func (o *InstanceCountByStatus) SetProvisioning(v int32) {
 	o.Provisioning = &v
-}
-
-// GetConfiguring returns the Configuring field value if set, zero value otherwise.
-func (o *InstanceCountByStatus) GetConfiguring() int32 {
-	if o == nil || IsNil(o.Configuring) {
-		var ret int32
-		return ret
-	}
-	return *o.Configuring
-}
-
-// GetConfiguringOk returns a tuple with the Configuring field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *InstanceCountByStatus) GetConfiguringOk() (*int32, bool) {
-	if o == nil || IsNil(o.Configuring) {
-		return nil, false
-	}
-	return o.Configuring, true
-}
-
-// HasConfiguring returns a boolean if a field has been set.
-func (o *InstanceCountByStatus) HasConfiguring() bool {
-	if o != nil && !IsNil(o.Configuring) {
-		return true
-	}
-
-	return false
-}
-
-// SetConfiguring gets a reference to the given int32 and assigns it to the Configuring field.
-func (o *InstanceCountByStatus) SetConfiguring(v int32) {
-	o.Configuring = &v
 }
 
 // GetReady returns the Ready field value if set, zero value otherwise.
@@ -422,9 +399,6 @@ func (o InstanceCountByStatus) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Provisioning) {
 		toSerialize["provisioning"] = o.Provisioning
-	}
-	if !IsNil(o.Configuring) {
-		toSerialize["configuring"] = o.Configuring
 	}
 	if !IsNil(o.Ready) {
 		toSerialize["ready"] = o.Ready
