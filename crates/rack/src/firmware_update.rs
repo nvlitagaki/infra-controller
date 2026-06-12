@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
+use carbide_secrets::credentials::{
+    BmcCredentialType, CredentialKey, CredentialManager, Credentials,
+};
 use carbide_uuid::rack::RackId;
 use carbide_uuid::switch::SwitchId;
 use db::{machine as db_machine, machine_topology as db_machine_topology, switch as db_switch};
 use eyre::{Result, eyre};
-use forge_secrets::credentials::{
-    BmcCredentialType, CredentialKey, CredentialManager, Credentials,
-};
 use librms::protos::rack_manager as rms;
 use model::machine::machine_search_config::MachineSearchConfig;
 use model::rack::FirmwareUpgradeDeviceInfo;
@@ -86,7 +86,6 @@ pub async fn load_rack_firmware_inventory(
             .topology()
             .bmc_info
             .ip
-            .as_deref()
             .ok_or_else(|| eyre!("machine {} missing BMC IP", machine_id))?;
         let (bmc_username, bmc_password) =
             fetch_bmc_credentials(credential_manager, bmc_mac).await?;

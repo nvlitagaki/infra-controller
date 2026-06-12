@@ -109,7 +109,7 @@ libredfish = { workspace = true }
 librms = { workspace = true }
 mac_address = { workspace = true }
 num_cpus = { workspace = true }
-nv-redfish = {workspace = true}
+nv-redfish = { workspace = true }
 opentelemetry = { workspace = true, features = ["logs"] }
 opentelemetry-otlp = { workspace = true, features = ["grpc-tonic"] }
 opentelemetry-prometheus = { workspace = true }
@@ -223,6 +223,7 @@ carbide-redfish = { path = "../redfish", features = ["test-support"] }
 carbide-rpc = { path = "../rpc", features = ["model", "sqlx", "test-support"] }
 carbide-secrets = { path = "../secrets", features = ["test-support"] }
 carbide-sqlx-testing = { path = "../sqlx-testing", default-features = false }
+carbide-test-support = { path = "../test-support" }
 carbide-utils = { path = "../utils", features = ["test-support"] }
 prometheus-text-parser = { path = "../prometheus-text-parser" }
 state-controller = { path = "../state-controller", features = ["test-support"] }

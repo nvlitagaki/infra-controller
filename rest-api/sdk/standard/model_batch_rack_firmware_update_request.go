@@ -4,7 +4,7 @@
 /*
 NVIDIA Infra Controller REST API
 
-NVIDIA Infra Controller REST API allows users to create and manage resources e.g. VPC, Subnets, Instances across all connected NVIDIA Infra Controller datacenters, also referred to as Sites.
+NVIDIA Infra Controller REST API allows users to create and manage resources, e.g., VPCs, Subnets, and Instances, across all connected NVIDIA Infra Controller datacenters, also referred to as Sites.
 
 API version: 1.6.0
 */
@@ -25,10 +25,13 @@ var _ MappedNullable = &BatchRackFirmwareUpdateRequest{}
 // BatchRackFirmwareUpdateRequest Request body for batch rack firmware update operations
 type BatchRackFirmwareUpdateRequest struct {
 	// ID of the Site
-	SiteId string      `json:"siteId"`
+	SiteId string `json:"siteId"`
+	// Filter that selects Racks targeted for firmware update
 	Filter *RackFilter `json:"filter,omitempty"`
 	// Target firmware version.
 	Version NullableString `json:"version,omitempty"`
+	// Optional Operation Rule UUID. When set, pins every task spawned by this batch to the named rule and overrides Flow's default rule resolution.
+	RuleId *string `json:"ruleId,omitempty"`
 }
 
 type _BatchRackFirmwareUpdateRequest BatchRackFirmwareUpdateRequest
@@ -150,6 +153,38 @@ func (o *BatchRackFirmwareUpdateRequest) UnsetVersion() {
 	o.Version.Unset()
 }
 
+// GetRuleId returns the RuleId field value if set, zero value otherwise.
+func (o *BatchRackFirmwareUpdateRequest) GetRuleId() string {
+	if o == nil || IsNil(o.RuleId) {
+		var ret string
+		return ret
+	}
+	return *o.RuleId
+}
+
+// GetRuleIdOk returns a tuple with the RuleId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *BatchRackFirmwareUpdateRequest) GetRuleIdOk() (*string, bool) {
+	if o == nil || IsNil(o.RuleId) {
+		return nil, false
+	}
+	return o.RuleId, true
+}
+
+// HasRuleId returns a boolean if a field has been set.
+func (o *BatchRackFirmwareUpdateRequest) HasRuleId() bool {
+	if o != nil && !IsNil(o.RuleId) {
+		return true
+	}
+
+	return false
+}
+
+// SetRuleId gets a reference to the given string and assigns it to the RuleId field.
+func (o *BatchRackFirmwareUpdateRequest) SetRuleId(v string) {
+	o.RuleId = &v
+}
+
 func (o BatchRackFirmwareUpdateRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -166,6 +201,9 @@ func (o BatchRackFirmwareUpdateRequest) ToMap() (map[string]interface{}, error) 
 	}
 	if o.Version.IsSet() {
 		toSerialize["version"] = o.Version.Get()
+	}
+	if !IsNil(o.RuleId) {
+		toSerialize["ruleId"] = o.RuleId
 	}
 	return toSerialize, nil
 }

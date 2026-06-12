@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 use std::fmt;
+use std::net::IpAddr;
 use std::str::FromStr;
 
 use carbide_uuid::domain::DomainId;
@@ -22,6 +23,7 @@ use carbide_uuid::network::NetworkSegmentId;
 use carbide_uuid::vpc::VpcId;
 use chrono::{DateTime, Utc};
 use config_version::{ConfigVersion, Versioned};
+use ipnetwork::IpNetwork;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgRow;
 use sqlx::{Column, FromRow, Row};
@@ -76,9 +78,9 @@ pub struct NetworkDefinition {
     #[serde(rename = "type")]
     pub segment_type: NetworkDefinitionSegmentType,
     /// CIDR notation
-    pub prefix: String,
+    pub prefix: IpNetwork,
     /// Usually the first IP in the prefix range
-    pub gateway: String,
+    pub gateway: IpAddr,
     /// Typically 9000 for admin network, 1500 for underlay
     pub mtu: i32,
     /// How many addresses to skip before allocating
@@ -91,15 +93,35 @@ pub struct NetworkDefinition {
     /// behavior of Carbide + carbide-dhcp.
     #[serde(default)]
     pub allocation_strategy: AllocationStrategy,
+    /// Set to the name of a VPC to attach this network segment to a VPC on creation. Will fail if
+    /// the VPC is not defined. You probably want to add a vpc with a corresponding name to the
+    /// config via `[vpcs.<name>]` for this to work when data is initially being seeded.
+    pub vpc_name: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum NetworkDefinitionSegmentType {
     Admin,
     Underlay,
     HostInband,
     // Tenant networks are created via the API, not the config file
+}
+
+impl From<NetworkDefinitionSegmentType> for crate::network_segment::NetworkSegmentType {
+    fn from(value: NetworkDefinitionSegmentType) -> Self {
+        match value {
+            NetworkDefinitionSegmentType::Admin => {
+                crate::network_segment::NetworkSegmentType::Admin
+            }
+            NetworkDefinitionSegmentType::Underlay => {
+                crate::network_segment::NetworkSegmentType::Underlay
+            }
+            NetworkDefinitionSegmentType::HostInband => {
+                crate::network_segment::NetworkSegmentType::HostInband
+            }
+        }
+    }
 }
 
 /// Returns the SLA for the current state
@@ -320,12 +342,8 @@ impl NewNetworkSegment {
         value: &NetworkDefinition,
     ) -> Result<Self, ModelError> {
         let prefix = NewNetworkPrefix {
-            prefix: value.prefix.parse().map_err(|_| {
-                ModelError::InvalidArgument(format!("Invalid network prefix: {}", value.prefix))
-            })?,
-            gateway: Some(value.gateway.parse().map_err(|_| {
-                ModelError::InvalidArgument(format!("Invalid gateway address: {}", value.gateway))
-            })?),
+            prefix: value.prefix,
+            gateway: Some(value.gateway),
             num_reserved: value.reserve_first,
         };
         Ok(NewNetworkSegment {
@@ -337,11 +355,7 @@ impl NewNetworkSegment {
             prefixes: vec![prefix],
             vlan_id: None,
             vni: None,
-            segment_type: match value.segment_type {
-                NetworkDefinitionSegmentType::Admin => NetworkSegmentType::Admin,
-                NetworkDefinitionSegmentType::Underlay => NetworkSegmentType::Underlay,
-                NetworkDefinitionSegmentType::HostInband => NetworkSegmentType::HostInband,
-            },
+            segment_type: value.segment_type.into(),
             can_stretch: None,
             allocation_strategy: value.allocation_strategy,
         })

@@ -4,7 +4,7 @@
 /*
 NVIDIA Infra Controller REST API
 
-NVIDIA Infra Controller REST API allows users to create and manage resources e.g. VPC, Subnets, Instances across all connected NVIDIA Infra Controller datacenters, also referred to as Sites.
+NVIDIA Infra Controller REST API allows users to create and manage resources, e.g., VPCs, Subnets, and Instances, across all connected NVIDIA Infra Controller datacenters, also referred to as Sites.
 
 API version: 1.6.0
 */
@@ -25,10 +25,13 @@ var _ MappedNullable = &BatchBringUpRackRequest{}
 // BatchBringUpRackRequest Request body for batch rack bring up operations
 type BatchBringUpRackRequest struct {
 	// ID of the Site
-	SiteId string      `json:"siteId"`
+	SiteId string `json:"siteId"`
+	// Filter that selects Racks targeted for bring-up
 	Filter *RackFilter `json:"filter,omitempty"`
 	// Optional description for the bring up operation
 	Description *string `json:"description,omitempty"`
+	// Optional Operation Rule UUID. When set, pins every bring-up task spawned by this batch to the named rule and overrides Flow's default rule resolution.
+	RuleId *string `json:"ruleId,omitempty"`
 }
 
 type _BatchBringUpRackRequest BatchBringUpRackRequest
@@ -139,6 +142,38 @@ func (o *BatchBringUpRackRequest) SetDescription(v string) {
 	o.Description = &v
 }
 
+// GetRuleId returns the RuleId field value if set, zero value otherwise.
+func (o *BatchBringUpRackRequest) GetRuleId() string {
+	if o == nil || IsNil(o.RuleId) {
+		var ret string
+		return ret
+	}
+	return *o.RuleId
+}
+
+// GetRuleIdOk returns a tuple with the RuleId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *BatchBringUpRackRequest) GetRuleIdOk() (*string, bool) {
+	if o == nil || IsNil(o.RuleId) {
+		return nil, false
+	}
+	return o.RuleId, true
+}
+
+// HasRuleId returns a boolean if a field has been set.
+func (o *BatchBringUpRackRequest) HasRuleId() bool {
+	if o != nil && !IsNil(o.RuleId) {
+		return true
+	}
+
+	return false
+}
+
+// SetRuleId gets a reference to the given string and assigns it to the RuleId field.
+func (o *BatchBringUpRackRequest) SetRuleId(v string) {
+	o.RuleId = &v
+}
+
 func (o BatchBringUpRackRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -155,6 +190,9 @@ func (o BatchBringUpRackRequest) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
+	}
+	if !IsNil(o.RuleId) {
+		toSerialize["ruleId"] = o.RuleId
 	}
 	return toSerialize, nil
 }

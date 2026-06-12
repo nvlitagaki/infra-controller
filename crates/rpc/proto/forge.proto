@@ -1266,6 +1266,7 @@ enum CredentialType {
   BmcForgeAdminByMacAddress = 9;
   NmxM = 10;
   BgpSiteWideLeafPassword = 11;
+  SiteWideNicLockdownIkm = 12;
 }
 
 message CredentialCreationRequest {
@@ -1694,6 +1695,9 @@ message VpcPrefixStatus {
   uint64 total_linknet_segments = 3;
   uint64 available_linknet_segments = 4;
   LifecycleStatus lifecycle = 5;
+
+  // Coarse tenant-facing state derived from lifecycle.state at the server side.
+  TenantState tenant_state = 6;
 }
 
 message VpcPrefixCreationRequest {
@@ -6936,8 +6940,14 @@ message DpaInterface {
   optional string mlxconfig_profile = 19;
 
   optional string device_description = 20;
+
+  DpaInterfaceType interface_type = 21;
 }
 
+enum DpaInterfaceType {
+  DPA_INTERFACE_TYPE_SVPC = 0;
+  DPA_INTERFACE_TYPE_ASTRA = 1;
+}
 
 message DpaInterfaceCreationRequest {
   common.MachineId machine_id = 1;
@@ -6945,6 +6955,7 @@ message DpaInterfaceCreationRequest {
   string device_type = 3;
   string pci_name = 4;
   optional string device_description = 5;
+  DpaInterfaceType interface_type = 6;
 }
 
 message DpaInterfaceIdList {
