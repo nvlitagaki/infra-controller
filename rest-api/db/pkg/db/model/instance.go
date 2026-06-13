@@ -249,7 +249,7 @@ func (c *InstanceCountByStatus) FromQueryResults(rows []instanceStatusCountQuery
 		case InstancePowerStatusRebooting:
 			c.Rebooting = count
 		case InstanceStatusUnknown:
-			c.Unknown = count
+			c.Unknown += count
 		default:
 			c.Unknown += count
 		}

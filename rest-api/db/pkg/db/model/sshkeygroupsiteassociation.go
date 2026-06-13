@@ -367,7 +367,7 @@ func (skgsasd SSHKeyGroupSiteAssociationSQLDAO) GetAll(ctx context.Context, tx *
 	skgsas := []SSHKeyGroupSiteAssociation{}
 
 	query := db.GetIDB(tx, skgsasd.dbSession).NewSelect().Model(&skgsas)
-	if len(filter.SSHKeyGroupIDs) > 0 {
+	if filter.SSHKeyGroupIDs != nil {
 		query = query.Where("skgsa.sshkey_group_id IN (?)", bun.In(filter.SSHKeyGroupIDs))
 		skgsasd.tracerSpan.SetAttribute(SSHKeyGroupSiteAssociationDAOSpan, "sshkey_group_id", filter.SSHKeyGroupIDs)
 	}

@@ -1177,7 +1177,7 @@ func TestSSHKeyHandler_Delete(t *testing.T) {
 				// verify sk associations
 				skaDAO := cdbm.NewSSHKeyAssociationDAO(dbSession)
 				_, tot, err := skaDAO.GetAll(ctx, nil, cdbm.SSHKeyAssociationFilterInput{
-					SSHKeyGroupIDs: []uuid.UUID{sk1.ID},
+					SSHKeyIDs: []uuid.UUID{sk1.ID},
 				}, cdbp.PageInput{}, nil)
 				assert.Nil(t, err)
 				assert.Equal(t, 0, tot)

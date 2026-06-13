@@ -201,15 +201,15 @@ func (skgiasd SSHKeyGroupInstanceAssociationSQLDAO) GetAll(ctx context.Context, 
 	skgias := []SSHKeyGroupInstanceAssociation{}
 
 	query := db.GetIDB(tx, skgiasd.dbSession).NewSelect().Model(&skgias)
-	if len(filter.SSHKeyGroupIDs) > 0 {
+	if filter.SSHKeyGroupIDs != nil {
 		query = query.Where("skgia.ssh_key_group_id IN (?)", bun.In(filter.SSHKeyGroupIDs))
 		skgiasd.tracerSpan.SetAttribute(SSHKeyGroupInstanceAssociationDAOSpan, "ssh_key_group_ids", filter.SSHKeyGroupIDs)
 	}
-	if len(filter.SiteIDs) > 0 {
+	if filter.SiteIDs != nil {
 		query = query.Where("skgia.site_id IN (?)", bun.In(filter.SiteIDs))
 		skgiasd.tracerSpan.SetAttribute(SSHKeyGroupInstanceAssociationDAOSpan, "site_ids", filter.SiteIDs)
 	}
-	if len(filter.InstanceIDs) > 0 {
+	if filter.InstanceIDs != nil {
 		query = query.Where("skgia.instance_id IN (?)", bun.In(filter.InstanceIDs))
 		skgiasd.tracerSpan.SetAttribute(SSHKeyGroupInstanceAssociationDAOSpan, "instance_ids", filter.InstanceIDs)
 	}

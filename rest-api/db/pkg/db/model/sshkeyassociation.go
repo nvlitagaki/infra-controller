@@ -183,11 +183,11 @@ func (skasd SSHKeyAssociationSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filt
 	skas := []SSHKeyAssociation{}
 
 	query := db.GetIDB(tx, skasd.dbSession).NewSelect().Model(&skas)
-	if len(filter.SSHKeyIDs) > 0 {
+	if filter.SSHKeyIDs != nil {
 		query = query.Where("ska.ssh_key_id IN (?)", bun.In(filter.SSHKeyIDs))
 		skasd.tracerSpan.SetAttribute(sshKeyAssociationDAOSpan, "ssh_key_id", filter.SSHKeyIDs)
 	}
-	if len(filter.SSHKeyGroupIDs) > 0 {
+	if filter.SSHKeyGroupIDs != nil {
 		query = query.Where("ska.sshkey_group_id IN (?)", bun.In(filter.SSHKeyGroupIDs))
 		skasd.tracerSpan.SetAttribute(sshKeyAssociationDAOSpan, "sshkey_group_id", filter.SSHKeyGroupIDs)
 	}

@@ -3090,7 +3090,7 @@ func (uih UpdateInstanceHandler) Handle(c echo.Context) error {
 					CreatedBy:     dbUser.ID,
 				})
 				if err != nil {
-					logger.Error().Err(serr).Msg("failed to create the SSH Key Group Instance Association record in DB")
+					logger.Error().Err(err).Msg("failed to create the SSH Key Group Instance Association record in DB")
 					return cutil.NewAPIError(http.StatusInternalServerError, "Failed to associate one or more SSH Key Group with Instance, DB error", nil)
 				}
 
