@@ -71,7 +71,22 @@ pub async fn remove_health_report(
     mode: HealthReportApplyMode,
     source: &str,
 ) -> Result<(), DatabaseError> {
-    crate::health_report::remove_health_report(txn, TABLE_NAME, domain_id, mode, source).await
+    crate::health_report::remove_health_report(txn, TABLE_NAME, domain_id, mode, source).await?;
+
+    let query = r#"
+        DELETE FROM nvlink_domain_health_reports
+        WHERE id = $1
+          AND health_reports->'merges' = '{}'::jsonb
+          AND coalesce(health_reports->'replace', 'null'::jsonb) = 'null'::jsonb
+        "#;
+
+    sqlx::query(query)
+        .bind(domain_id)
+        .execute(txn)
+        .await
+        .map_err(|e| DatabaseError::new("delete empty NVLink domain health reports", e))?;
+
+    Ok(())
 }
 
 /// Creates the domain row before applying a JSON health-report update.
