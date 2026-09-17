@@ -2654,6 +2654,9 @@ message SwitchStatus {
   LifecycleStatus lifecycle = 9;
   optional string fabric_manager_status = 10;
   optional FabricManagerStatus fabric_manager_status_details = 11;
+
+  // NVOS management endpoints, ordered by MAC address and then IP address.
+  repeated SwitchNvosInfo nvos_infos = 12;
 }
 
 message PlacementInRack {
@@ -2691,7 +2694,8 @@ message Switch {
   reserved 12, 13;
   bool is_primary = 14;
 
-  // NVOS host endpoint
+  // Deprecated: use status.nvos_infos. The first endpoint is retained here
+  // for compatibility with existing clients.
   SwitchNvosInfo nvos_info = 15;
 
   // NVLink domain UUID

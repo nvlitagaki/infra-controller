@@ -144,6 +144,7 @@ impl TryFrom<Switch> for rpc::Switch {
                         lifecycle: Some(lifecycle),
                         fabric_manager_status,
                         fabric_manager_status_details,
+                        nvos_infos: Vec::new(),
                     }
                 }
                 (None, fabric_manager_status, fabric_manager_status_details) => rpc::SwitchStatus {
@@ -158,6 +159,7 @@ impl TryFrom<Switch> for rpc::Switch {
                     lifecycle: Some(lifecycle),
                     fabric_manager_status,
                     fabric_manager_status_details,
+                    nvos_infos: Vec::new(),
                 },
             },
         );

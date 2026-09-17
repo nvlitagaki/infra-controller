@@ -17,6 +17,8 @@
 
 use carbide_test_harness::prelude::*;
 use carbide_uuid::switch::SwitchId;
+use mac_address::MacAddress;
+use model::address_selection_strategy::AddressSelectionStrategy;
 
 async fn create_discovered_switch(
     env: &TestHarness,
@@ -27,6 +29,45 @@ async fn create_discovered_switch(
     let switch = db::test_support::switch::create_seeded_discovered(&mut txn, seed, name).await?;
     txn.commit().await?;
     Ok(switch.id)
+}
+
+async fn add_nvos_interface(
+    env: &TestHarness,
+    switch_id: SwitchId,
+    nvos_mac: MacAddress,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut txn = env.db_txn().await;
+    let rows = db::switch::find_switch_nvos_endpoints_by_ids(txn.as_mut(), &[switch_id]).await?;
+    let first_nvos_mac = rows
+        .first()
+        .and_then(|row| row.nvos_mac)
+        .expect("seeded NVOS MAC");
+    let endpoint_rows =
+        db::switch::find_switch_endpoints_by_ids(txn.as_mut(), &[switch_id]).await?;
+    let bmc_mac = endpoint_rows
+        .first()
+        .expect("seeded switch endpoint")
+        .bmc_mac;
+
+    db::expected_switch::update_nvos_mac_addresses(
+        txn.as_mut(),
+        bmc_mac,
+        &[first_nvos_mac, nvos_mac],
+    )
+    .await?;
+
+    let admin_segments = db::network_segment::admin(txn.as_mut()).await?;
+    db::machine_interface::create(
+        txn.as_mut(),
+        &admin_segments,
+        &nvos_mac,
+        false,
+        AddressSelectionStrategy::NextAvailableIp,
+        None,
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(())
 }
 
 #[sqlx_test]
@@ -251,6 +292,8 @@ async fn test_find_switches_by_ids_includes_resolved_nvos_info(
     assert_eq!(nvos_info.mac, Some(host_mac.to_string()));
     assert_eq!(nvos_info.ip, Some(host_ip.to_string()));
     assert!(nvos_info.port.is_none());
+    let nvos_infos = &switch.status.as_ref().expect("switch status").nvos_infos;
+    assert_eq!(nvos_infos, std::slice::from_ref(nvos_info));
 
     Ok(())
 }
@@ -284,6 +327,45 @@ async fn test_find_switches_includes_resolved_nvos_info(
     assert_eq!(nvos_info.mac, Some(host_mac.to_string()));
     assert_eq!(nvos_info.ip, Some(host_ip.to_string()));
     assert!(nvos_info.port.is_none());
+    let nvos_infos = &response.switches[0]
+        .status
+        .as_ref()
+        .expect("switch status")
+        .nvos_infos;
+    assert_eq!(nvos_infos, std::slice::from_ref(nvos_info));
+
+    Ok(())
+}
+
+#[sqlx_test]
+async fn test_find_switches_by_ids_includes_all_nvos_endpoints(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let env = TestHarness::builder(pool).build().await;
+    let switch_id = create_discovered_switch(&env, 1, "Switch1").await?;
+    let second_nvos_mac = "44:44:33:33:01:01".parse()?;
+    add_nvos_interface(&env, switch_id, second_nvos_mac).await?;
+
+    let response = env
+        .api()
+        .find_switches_by_ids(tonic::Request::new(rpc::forge::SwitchesByIdsRequest {
+            switch_ids: vec![switch_id],
+        }))
+        .await?
+        .into_inner();
+
+    let switch = response.switches.first().expect("switch response");
+    let nvos_infos = &switch.status.as_ref().expect("switch status").nvos_infos;
+    assert_eq!(nvos_infos.len(), 2);
+    assert_eq!(
+        nvos_infos
+            .iter()
+            .filter_map(|info| info.mac.as_deref())
+            .collect::<Vec<_>>(),
+        vec!["44:44:33:33:01:00", "44:44:33:33:01:01"],
+    );
+    assert!(nvos_infos.iter().all(|info| info.ip.is_some()));
+    assert_eq!(switch.nvos_info.as_ref(), nvos_infos.first());
 
     Ok(())
 }
@@ -311,6 +393,14 @@ async fn test_find_switches_by_ids_returns_no_nvos_info_when_unresolved(
 
     assert_eq!(response.switches.len(), 1);
     assert!(response.switches[0].nvos_info.is_none());
+    assert!(
+        response.switches[0]
+            .status
+            .as_ref()
+            .expect("switch status")
+            .nvos_infos
+            .is_empty()
+    );
 
     Ok(())
 }

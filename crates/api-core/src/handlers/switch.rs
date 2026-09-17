@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use ::rpc::errors::RpcDataConversionError;
 use ::rpc::forge::{self as rpc, HealthReportEntry};
 use carbide_uuid::machine::MachineInterfaceId;
+use carbide_uuid::switch::SwitchId;
 use db::{ObjectColumnFilter, switch as db_switch};
 use health_report::HealthReportApplyMode;
 use mac_address::MacAddress;
@@ -51,7 +52,7 @@ async fn associated_switch_macs(
 }
 
 fn switch_nvos_info_from_endpoint_row(
-    row: &db_switch::SwitchEndpointRow,
+    row: &db_switch::SwitchNvosEndpointRow,
 ) -> Option<rpc::SwitchNvosInfo> {
     let ip = row.nvos_ip.as_ref().map(ToString::to_string);
     let mac = row.nvos_mac.as_ref().map(ToString::to_string);
@@ -65,6 +66,38 @@ fn switch_nvos_info_from_endpoint_row(
         mac,
         port: None,
     })
+}
+
+async fn load_switch_nvos_info(
+    txn: &mut PgConnection,
+    switch_ids: &[SwitchId],
+) -> Result<HashMap<SwitchId, Vec<rpc::SwitchNvosInfo>>, CarbideError> {
+    let rows = db_switch::find_switch_nvos_endpoints_by_ids(txn, switch_ids).await?;
+    let mut nvos_info_by_switch: HashMap<SwitchId, Vec<rpc::SwitchNvosInfo>> = HashMap::new();
+
+    for row in rows {
+        let switch_id = row.switch_id;
+        let Some(nvos_info) = switch_nvos_info_from_endpoint_row(&row) else {
+            continue;
+        };
+        nvos_info_by_switch
+            .entry(switch_id)
+            .or_default()
+            .push(nvos_info);
+    }
+
+    Ok(nvos_info_by_switch)
+}
+
+fn populate_switch_nvos_info(
+    rpc_switch: &mut rpc::Switch,
+    nvos_infos: Option<&[rpc::SwitchNvosInfo]>,
+) {
+    let nvos_infos = nvos_infos.unwrap_or_default().to_vec();
+    rpc_switch.nvos_info = nvos_infos.first().cloned();
+    if let Some(status) = rpc_switch.status.as_mut() {
+        status.nvos_infos = nvos_infos;
+    }
 }
 
 pub(crate) async fn find_switch(
@@ -110,17 +143,14 @@ pub(crate) async fn find_switch(
     };
 
     let switch_ids: Vec<_> = switch_list.iter().map(|switch| switch.id).collect();
-    let endpoint_info_map: std::collections::HashMap<_, _> = if switch_ids.is_empty() {
-        std::collections::HashMap::new()
+    let nvos_info_by_switch = if switch_ids.is_empty() {
+        HashMap::new()
     } else {
-        db_switch::find_switch_endpoints_by_ids(&mut *txn, &switch_ids)
+        load_switch_nvos_info(txn.as_mut(), &switch_ids)
             .await
             .map_err(|e| CarbideError::Internal {
-                message: format!("Failed to get switch endpoint info: {}", e),
+                message: format!("Failed to get switch NVOS endpoint info: {}", e),
             })?
-            .into_iter()
-            .map(|row| (row.switch_id, row))
-            .collect()
     };
 
     txn.commit().await.map_err(|e| CarbideError::Internal {
@@ -131,13 +161,10 @@ pub(crate) async fn find_switch(
         .into_iter()
         .map(|s| {
             let id = s.id;
-            let endpoint_info = endpoint_info_map.get(&id);
+            let nvos_infos = nvos_info_by_switch.get(&id).map(Vec::as_slice);
 
-            // `bmc_info` is populated by the switch load query and carried
-            // through the model->rpc conversion; only nvos_info is stitched in
-            // here from the endpoint lookup.
             rpc::Switch::try_from(s).map(|mut rpc_switch| {
-                rpc_switch.nvos_info = endpoint_info.and_then(switch_nvos_info_from_endpoint_row);
+                populate_switch_nvos_info(&mut rpc_switch, nvos_infos);
                 rpc_switch
             })
         })
@@ -190,15 +217,11 @@ pub(crate) async fn find_by_ids(
     )
     .await?;
 
-    let endpoint_info_map: std::collections::HashMap<_, _> =
-        db_switch::find_switch_endpoints_by_ids(&mut txn, &switch_ids)
-            .await
-            .map_err(|e| CarbideError::Internal {
-                message: format!("Failed to get switch endpoint info: {}", e),
-            })?
-            .into_iter()
-            .map(|row| (row.switch_id, row))
-            .collect();
+    let nvos_info_by_switch = load_switch_nvos_info(txn.as_mut(), &switch_ids)
+        .await
+        .map_err(|e| CarbideError::Internal {
+            message: format!("Failed to get switch NVOS endpoint info: {}", e),
+        })?;
 
     txn.rollback_or_log("read-only load of switches by id")
         .await;
@@ -207,13 +230,10 @@ pub(crate) async fn find_by_ids(
         .into_iter()
         .map(|s| {
             let id = s.id;
-            let endpoint_info = endpoint_info_map.get(&id);
+            let nvos_infos = nvos_info_by_switch.get(&id).map(Vec::as_slice);
 
-            // `bmc_info` is populated by the switch load query and carried
-            // through the model->rpc conversion; only nvos_info is stitched in
-            // here from the endpoint lookup.
             rpc::Switch::try_from(s).map(|mut rpc_switch| {
-                rpc_switch.nvos_info = endpoint_info.and_then(switch_nvos_info_from_endpoint_row);
+                populate_switch_nvos_info(&mut rpc_switch, nvos_infos);
                 rpc_switch
             })
         })
@@ -685,19 +705,16 @@ mod switch_nvos_info_tests {
     use std::str::FromStr;
 
     use carbide_uuid::switch::{SwitchId, SwitchIdSource, SwitchType};
-    use db::switch::SwitchEndpointRow;
+    use db::switch::SwitchNvosEndpointRow;
     use mac_address::MacAddress;
 
     use super::switch_nvos_info_from_endpoint_row;
 
-    fn endpoint_row(nvos_mac: Option<&str>, nvos_ip: Option<&str>) -> SwitchEndpointRow {
-        SwitchEndpointRow {
+    fn endpoint_row(nvos_mac: Option<&str>, nvos_ip: Option<&str>) -> SwitchNvosEndpointRow {
+        SwitchNvosEndpointRow {
             switch_id: SwitchId::new(SwitchIdSource::Tpm, [0u8; 32], SwitchType::NvLink),
-            bmc_mac: MacAddress::from_str("b8:3f:d2:1a:44:9c").unwrap(),
-            bmc_ip: IpAddr::from_str("10.0.0.1").unwrap(),
             nvos_mac: nvos_mac.map(|mac| MacAddress::from_str(mac).unwrap()),
             nvos_ip: nvos_ip.map(|ip| IpAddr::from_str(ip).unwrap()),
-            nvos_hostname: None,
         }
     }
 
