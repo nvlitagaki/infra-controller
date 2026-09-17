@@ -701,6 +701,9 @@ service Forge {
   // Machine-Validation executed list
   rpc GetMachineValidationRuns(MachineValidationRunListGetRequest) returns (MachineValidationRunList);
 
+  // Bounded, cursor-paginated Machine-Validation executed list
+  rpc ListMachineValidationRuns(ListMachineValidationRunsRequest) returns (ListMachineValidationRunsResponse);
+
   // Machine-Validation run item IDs
   rpc FindMachineValidationRunItemIds(MachineValidationRunItemSearchFilter) returns (MachineValidationRunItemIdList);
 
@@ -7144,6 +7147,39 @@ message MachineValidationRunList {
 message MachineValidationRunListGetRequest {
   common.MachineId machine_id = 1;
   bool include_history = 2;
+}
+
+enum MachineValidationRunState {
+  MACHINE_VALIDATION_RUN_STATE_UNSPECIFIED = 0;
+  MACHINE_VALIDATION_RUN_STATE_STARTED = 1;
+  MACHINE_VALIDATION_RUN_STATE_IN_PROGRESS = 2;
+  MACHINE_VALIDATION_RUN_STATE_SUCCESS = 3;
+  MACHINE_VALIDATION_RUN_STATE_FAILED = 4;
+  MACHINE_VALIDATION_RUN_STATE_SKIPPED = 5;
+}
+
+message ListMachineValidationRunsRequest {
+  // Restrict results to one Machine. Omit to list runs for the whole Site.
+  common.MachineId machine_id = 1;
+  // Inclusive lower bound for the run start time.
+  google.protobuf.Timestamp started_after = 2;
+  // Exclusive upper bound for the run start time.
+  google.protobuf.Timestamp started_before = 3;
+  // Number of runs to return. Zero uses the server default; values above the
+  // server maximum are rejected.
+  uint32 page_size = 4;
+  // Opaque continuation token returned by the previous response.
+  string page_token = 5;
+  // Restrict results to runs in this state. Unspecified returns every state.
+  MachineValidationRunState state = 6;
+}
+
+message ListMachineValidationRunsResponse {
+  repeated MachineValidationRun runs = 1;
+  // Empty when there are no more results.
+  string next_page_token = 2;
+  // Total runs matching the filters, independent of the current page.
+  uint64 total_size = 3;
 }
 
 message MachineValidationRunItemSearchFilter {

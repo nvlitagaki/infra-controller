@@ -4,11 +4,14 @@
 package model
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/NVIDIA/infra-controller/rest-api/api/pkg/api/model/util"
 	corev1 "github.com/NVIDIA/infra-controller/rest-api/proto/core/gen/v1"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // APIMachineValidationTest data structure to capture MachineValidation test
@@ -312,6 +315,74 @@ type APIMachineValidationRun struct {
 	DurationToCompleteSecs int64                      `json:"durationToCompleteSecs"`
 }
 
+const (
+	DefaultMachineValidationRunPageSize uint32 = 20
+	MaxMachineValidationRunPageSize     uint32 = 100
+)
+
+// APIMachineValidationRunListRequest captures the filters and cursor for a
+// site-wide validation run listing.
+type APIMachineValidationRunListRequest struct {
+	SiteID        string
+	MachineID     string
+	StartedAfter  *time.Time
+	StartedBefore *time.Time
+	State         APIMachineValidationState
+	PageSize      uint32
+	PageToken     string
+}
+
+// Validate ensures the request is bounded and its time window is ordered.
+func (r APIMachineValidationRunListRequest) Validate() error {
+	if r.SiteID == "" {
+		return errors.New("siteId query parameter is required")
+	}
+	if r.PageSize > MaxMachineValidationRunPageSize {
+		return fmt.Errorf("pageSize must be less than or equal to %d", MaxMachineValidationRunPageSize)
+	}
+	if r.StartedAfter != nil && r.StartedBefore != nil && !r.StartedAfter.Before(*r.StartedBefore) {
+		return errors.New("startedAfter must be earlier than startedBefore")
+	}
+	if r.State != "" && !r.State.IsValid() {
+		return errors.New("state must be one of Started, InProgress, Success, Failed, or Skipped")
+	}
+	return nil
+}
+
+// EffectivePageSize returns the server default when the caller omits pageSize.
+func (r APIMachineValidationRunListRequest) EffectivePageSize() uint32 {
+	if r.PageSize == 0 {
+		return DefaultMachineValidationRunPageSize
+	}
+	return r.PageSize
+}
+
+// ToProto converts the REST list request to the Core request.
+func (r APIMachineValidationRunListRequest) ToProto() *corev1.ListMachineValidationRunsRequest {
+	request := &corev1.ListMachineValidationRunsRequest{
+		PageSize:  r.PageSize,
+		PageToken: r.PageToken,
+		State:     r.State.ToProto(),
+	}
+	if r.MachineID != "" {
+		request.MachineId = &corev1.MachineId{Id: r.MachineID}
+	}
+	if r.StartedAfter != nil {
+		request.StartedAfter = timestamppb.New(*r.StartedAfter)
+	}
+	if r.StartedBefore != nil {
+		request.StartedBefore = timestamppb.New(*r.StartedBefore)
+	}
+	return request
+}
+
+// APIMachineValidationRunPage describes the cursor for the next page.
+type APIMachineValidationRunPage struct {
+	PageSize      uint32 `json:"pageSize"`
+	Total         uint64 `json:"total"`
+	NextPageToken string `json:"nextPageToken,omitempty"`
+}
+
 type APIMachineValidationState string
 
 const (
@@ -321,6 +392,36 @@ const (
 	MachineValidationFailed     APIMachineValidationState = "Failed"
 	MachineValidationSkipped    APIMachineValidationState = "Skipped"
 )
+
+func (state APIMachineValidationState) IsValid() bool {
+	switch state {
+	case MachineValidationStarted,
+		MachineValidationInProgress,
+		MachineValidationSuccess,
+		MachineValidationFailed,
+		MachineValidationSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+func (state APIMachineValidationState) ToProto() corev1.MachineValidationRunState {
+	switch state {
+	case MachineValidationStarted:
+		return corev1.MachineValidationRunState_MACHINE_VALIDATION_RUN_STATE_STARTED
+	case MachineValidationInProgress:
+		return corev1.MachineValidationRunState_MACHINE_VALIDATION_RUN_STATE_IN_PROGRESS
+	case MachineValidationSuccess:
+		return corev1.MachineValidationRunState_MACHINE_VALIDATION_RUN_STATE_SUCCESS
+	case MachineValidationFailed:
+		return corev1.MachineValidationRunState_MACHINE_VALIDATION_RUN_STATE_FAILED
+	case MachineValidationSkipped:
+		return corev1.MachineValidationRunState_MACHINE_VALIDATION_RUN_STATE_SKIPPED
+	default:
+		return corev1.MachineValidationRunState_MACHINE_VALIDATION_RUN_STATE_UNSPECIFIED
+	}
+}
 
 type APIMachineValidationStatus struct {
 	State     APIMachineValidationState `json:"state"`

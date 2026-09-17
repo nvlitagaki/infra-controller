@@ -36,12 +36,69 @@ use model::machine::{
 use rpc::Timestamp;
 use rpc::forge::forge_server::Forge;
 use rpc::forge::{
-    MachineValidationTestFullHostApprovalRequest, MachineValidationTestNextVersionRequest,
-    MachineValidationTestVerfiedRequest,
+    ListMachineValidationRunsRequest, MachineValidationTestFullHostApprovalRequest,
+    MachineValidationTestNextVersionRequest, MachineValidationTestVerfiedRequest,
 };
 
 use crate::handlers::machine_validation::apply_config_on_startup;
 use crate::tests::common;
+
+#[crate::sqlx_test]
+async fn test_list_machine_validation_runs_is_bounded_by_default(
+    pool: sqlx::PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let env = create_test_env(pool).await;
+    let response = env
+        .api
+        .list_machine_validation_runs(tonic::Request::new(
+            ListMachineValidationRunsRequest::default(),
+        ))
+        .await?
+        .into_inner();
+    assert!(response.runs.is_empty());
+    assert_eq!(response.total_size, 0);
+    assert!(response.next_page_token.is_empty());
+
+    Ok(())
+}
+
+#[crate::sqlx_test]
+async fn test_list_machine_validation_runs_rejects_invalid_pagination(
+    pool: sqlx::PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let env = create_test_env(pool).await;
+    let oversized = env
+        .api
+        .list_machine_validation_runs(tonic::Request::new(ListMachineValidationRunsRequest {
+            page_size: 101,
+            ..Default::default()
+        }))
+        .await
+        .unwrap_err();
+    assert_eq!(oversized.code(), tonic::Code::InvalidArgument);
+
+    let invalid_token = env
+        .api
+        .list_machine_validation_runs(tonic::Request::new(ListMachineValidationRunsRequest {
+            page_token: "not-a-valid-token".to_string(),
+            ..Default::default()
+        }))
+        .await
+        .unwrap_err();
+    assert_eq!(invalid_token.code(), tonic::Code::InvalidArgument);
+
+    let invalid_state = env
+        .api
+        .list_machine_validation_runs(tonic::Request::new(ListMachineValidationRunsRequest {
+            state: 99,
+            ..Default::default()
+        }))
+        .await
+        .unwrap_err();
+    assert_eq!(invalid_state.code(), tonic::Code::InvalidArgument);
+
+    Ok(())
+}
 
 #[crate::sqlx_test]
 async fn test_machine_validation_complete_with_error(

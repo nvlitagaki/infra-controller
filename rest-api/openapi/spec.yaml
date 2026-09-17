@@ -11288,6 +11288,102 @@ paths:
         Org must have an Infrastructure Provider entity and own the Site that
         the Machine belongs to. User must have authorization role with
         `PROVIDER_ADMIN` suffix.
+  '/v2/org/{org}/nico/machine/validation/run':
+    parameters:
+      - schema:
+          type: string
+        name: org
+        in: path
+        required: true
+        description: Name of the Org
+    get:
+      summary: List Machine validation runs
+      tags:
+        - Machine Validation
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          name: siteId
+          in: query
+          required: true
+          description: ID of the Site whose validation runs are listed.
+        - schema:
+            type: string
+          name: machineId
+          in: query
+          required: false
+          description: Return only validation runs for this Machine.
+        - schema:
+            type: string
+            enum:
+              - Started
+              - InProgress
+              - Success
+              - Failed
+              - Skipped
+          name: state
+          in: query
+          required: false
+          description: Return only validation runs in this state.
+        - schema:
+            type: string
+            format: date-time
+          name: startedAfter
+          in: query
+          required: false
+          description: Inclusive lower bound for the validation run start time.
+        - schema:
+            type: string
+            format: date-time
+          name: startedBefore
+          in: query
+          required: false
+          description: Exclusive upper bound for the validation run start time.
+        - schema:
+            type: integer
+            format: uint32
+            minimum: 1
+            maximum: 100
+            default: 20
+          name: pageSize
+          in: query
+          required: false
+          description: Maximum number of validation runs to return.
+        - schema:
+            type: string
+          name: pageToken
+          in: query
+          required: false
+          description: Opaque token returned in the previous response's X-Pagination header.
+      responses:
+        '200':
+          description: Machine validation runs ordered by start time descending.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MachineValidationRun'
+          headers:
+            X-Pagination:
+              schema:
+                type: string
+                example: '{"pageSize":20,"total":42,"nextPageToken":"opaque-token"}'
+              description: Cursor pagination result in JSON format. nextPageToken is omitted on the final page.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/GenericHttpError'
+      operationId: list-machine-validation-runs
+      description: |-
+        List validation runs across one Site. Filters compose with AND. Results
+        are ordered by start time descending, then validation ID descending,
+        and are always bounded to at most 100 entries per request.
+
+        Org must have an Infrastructure Provider entity that owns the Site. User must have authorization role with `PROVIDER_ADMIN` suffix.
   '/v2/org/{org}/nico/machine/{machineId}/validation/run':
     parameters:
       - schema:

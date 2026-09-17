@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // MachineValidationAPIService MachineValidationAPI service
@@ -296,6 +297,221 @@ func (a *MachineValidationAPIService) GetAllMachineValidationRunsExecute(r ApiGe
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v NICoAPIError
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v NICoAPIError
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiListMachineValidationRunsRequest struct {
+	ctx           context.Context
+	ApiService    *MachineValidationAPIService
+	siteId        *string
+	org           string
+	machineId     *string
+	state         *string
+	startedAfter  *time.Time
+	startedBefore *time.Time
+	pageSize      *uint32
+	pageToken     *string
+}
+
+// ID of the Site whose validation runs are listed.
+func (r ApiListMachineValidationRunsRequest) SiteId(siteId string) ApiListMachineValidationRunsRequest {
+	r.siteId = &siteId
+	return r
+}
+
+// Return only validation runs for this Machine.
+func (r ApiListMachineValidationRunsRequest) MachineId(machineId string) ApiListMachineValidationRunsRequest {
+	r.machineId = &machineId
+	return r
+}
+
+// Return only validation runs in this state.
+func (r ApiListMachineValidationRunsRequest) State(state string) ApiListMachineValidationRunsRequest {
+	r.state = &state
+	return r
+}
+
+// Inclusive lower bound for the validation run start time.
+func (r ApiListMachineValidationRunsRequest) StartedAfter(startedAfter time.Time) ApiListMachineValidationRunsRequest {
+	r.startedAfter = &startedAfter
+	return r
+}
+
+// Exclusive upper bound for the validation run start time.
+func (r ApiListMachineValidationRunsRequest) StartedBefore(startedBefore time.Time) ApiListMachineValidationRunsRequest {
+	r.startedBefore = &startedBefore
+	return r
+}
+
+// Maximum number of validation runs to return.
+func (r ApiListMachineValidationRunsRequest) PageSize(pageSize uint32) ApiListMachineValidationRunsRequest {
+	r.pageSize = &pageSize
+	return r
+}
+
+// Opaque token returned in the previous response&#39;s X-Pagination header.
+func (r ApiListMachineValidationRunsRequest) PageToken(pageToken string) ApiListMachineValidationRunsRequest {
+	r.pageToken = &pageToken
+	return r
+}
+
+func (r ApiListMachineValidationRunsRequest) Execute() ([]MachineValidationRun, *http.Response, error) {
+	return r.ApiService.ListMachineValidationRunsExecute(r)
+}
+
+/*
+ListMachineValidationRuns List Machine validation runs
+
+List validation runs across one Site. Filters compose with AND. Results
+are ordered by start time descending, then validation ID descending,
+and are always bounded to at most 100 entries per request.
+
+Org must have an Infrastructure Provider entity that owns the Site. User must have authorization role with `PROVIDER_ADMIN` suffix.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param org Name of the Org
+	@return ApiListMachineValidationRunsRequest
+*/
+func (a *MachineValidationAPIService) ListMachineValidationRuns(ctx context.Context, org string) ApiListMachineValidationRunsRequest {
+	return ApiListMachineValidationRunsRequest{
+		ApiService: a,
+		ctx:        ctx,
+		org:        org,
+	}
+}
+
+// Execute executes the request
+//
+//	@return []MachineValidationRun
+func (a *MachineValidationAPIService) ListMachineValidationRunsExecute(r ApiListMachineValidationRunsRequest) ([]MachineValidationRun, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue []MachineValidationRun
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "MachineValidationAPIService.ListMachineValidationRuns")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v2/org/{org}/nico/machine/validation/run"
+	localVarPath = strings.Replace(localVarPath, "{"+"org"+"}", url.PathEscape(parameterValueToString(r.org, "org")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.siteId == nil {
+		return localVarReturnValue, nil, reportError("siteId is required and must be specified")
+	}
+
+	parameterAddToHeaderOrQuery(localVarQueryParams, "siteId", r.siteId, "form", "")
+	if r.machineId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "machineId", r.machineId, "form", "")
+	}
+	if r.state != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "state", r.state, "form", "")
+	}
+	if r.startedAfter != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "startedAfter", r.startedAfter, "form", "")
+	}
+	if r.startedBefore != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "startedBefore", r.startedBefore, "form", "")
+	}
+	if r.pageSize != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "pageSize", r.pageSize, "form", "")
+	} else {
+		var defaultValue uint32 = 20
+		parameterAddToHeaderOrQuery(localVarQueryParams, "pageSize", defaultValue, "form", "")
+		r.pageSize = &defaultValue
+	}
+	if r.pageToken != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "pageToken", r.pageToken, "form", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v NICoAPIError
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
 			var v NICoAPIError
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {

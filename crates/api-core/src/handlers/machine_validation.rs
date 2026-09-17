@@ -14,11 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use ::rpc::forge::{self as rpc, GetMachineValidationExternalConfigResponse};
+use ::rpc::{
+    Timestamp,
+    forge::{self as rpc, GetMachineValidationExternalConfigResponse},
+};
+use base64::Engine;
 use carbide_machine_controller::config::machine_validation::{
     MachineValidationConfig, MachineValidationTestSelectionMode,
 };
-use carbide_uuid::machine_validation::{MachineValidationAttemptId, MachineValidationRunItemId};
+use carbide_uuid::machine_validation::{
+    MachineValidationAttemptId, MachineValidationId, MachineValidationRunItemId,
+};
+use chrono::{DateTime, Utc};
 use config_version::ConfigVersion;
 use db::{self, machine_validation_suites};
 use model::machine::machine_search_config::MachineSearchConfig;
@@ -54,6 +61,8 @@ use crate::machine_validation::{
 /// Remove or set `false` once add/update (and external-config update) paths are hardened.
 const MACHINE_VALIDATION_MUTATION_NOOP: bool = true;
 const MAX_PLUGIN_TIMEOUT_SECONDS: i64 = 24 * 60 * 60;
+const DEFAULT_MACHINE_VALIDATION_RUN_PAGE_SIZE: u32 = 20;
+const MAX_MACHINE_VALIDATION_RUN_PAGE_SIZE: u32 = 100;
 
 fn machine_validation_mutation_disabled_status() -> Status {
     Status::failed_precondition(
@@ -508,6 +517,139 @@ pub(crate) async fn get_machine_validation_runs(
         .map(Response::new)?;
 
     Ok(ret)
+}
+
+fn machine_validation_timestamp(
+    timestamp: Timestamp,
+    field_name: &'static str,
+) -> Result<DateTime<Utc>, Status> {
+    let nanos = u32::try_from(timestamp.nanos)
+        .ok()
+        .filter(|nanos| *nanos < 1_000_000_000)
+        .ok_or_else(|| Status::invalid_argument(format!("invalid {field_name}")))?;
+    DateTime::from_timestamp(timestamp.seconds, nanos)
+        .ok_or_else(|| Status::invalid_argument(format!("invalid {field_name}")))
+}
+
+fn encode_machine_validation_page_token(run: &MachineValidation) -> Result<String, Status> {
+    let start_time = run
+        .start_time
+        .ok_or_else(|| Status::internal("machine validation run is missing start_time"))?;
+    let value = format!(
+        "{}:{}:{}",
+        start_time.timestamp(),
+        start_time.timestamp_subsec_nanos(),
+        run.id
+    );
+    Ok(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(value))
+}
+
+fn decode_machine_validation_page_token(
+    token: &str,
+) -> Result<db::machine_validation::MachineValidationPageCursor, Status> {
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(token)
+        .map_err(|_| Status::invalid_argument("invalid page_token"))?;
+    let decoded = std::str::from_utf8(&decoded)
+        .map_err(|_| Status::invalid_argument("invalid page_token"))?;
+    let mut parts = decoded.splitn(3, ':');
+    let seconds = parts
+        .next()
+        .and_then(|value| value.parse::<i64>().ok())
+        .ok_or_else(|| Status::invalid_argument("invalid page_token"))?;
+    let nanos = parts
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        .filter(|nanos| *nanos < 1_000_000_000)
+        .ok_or_else(|| Status::invalid_argument("invalid page_token"))?;
+    let id = parts
+        .next()
+        .and_then(|value| value.parse::<MachineValidationId>().ok())
+        .ok_or_else(|| Status::invalid_argument("invalid page_token"))?;
+    let start_time = DateTime::from_timestamp(seconds, nanos)
+        .ok_or_else(|| Status::invalid_argument("invalid page_token"))?;
+
+    Ok(db::machine_validation::MachineValidationPageCursor { start_time, id })
+}
+
+pub(crate) async fn list_machine_validation_runs(
+    api: &Api,
+    request: tonic::Request<rpc::ListMachineValidationRunsRequest>,
+) -> Result<tonic::Response<rpc::ListMachineValidationRunsResponse>, Status> {
+    log_request_data(&request);
+    let request = request.into_inner();
+    let page_size = match request.page_size {
+        0 => DEFAULT_MACHINE_VALIDATION_RUN_PAGE_SIZE,
+        page_size if page_size <= MAX_MACHINE_VALIDATION_RUN_PAGE_SIZE => page_size,
+        _ => {
+            return Err(Status::invalid_argument(format!(
+                "page_size must not exceed {MAX_MACHINE_VALIDATION_RUN_PAGE_SIZE}"
+            )));
+        }
+    };
+    let machine_id = request
+        .machine_id
+        .as_ref()
+        .map(|id| convert_and_log_machine_id(Some(id)))
+        .transpose()?;
+    let started_after = request
+        .started_after
+        .map(|timestamp| machine_validation_timestamp(timestamp, "started_after"))
+        .transpose()?;
+    let started_before = request
+        .started_before
+        .map(|timestamp| machine_validation_timestamp(timestamp, "started_before"))
+        .transpose()?;
+    if started_after
+        .zip(started_before)
+        .is_some_and(|(after, before)| after >= before)
+    {
+        return Err(Status::invalid_argument(
+            "started_after must be earlier than started_before",
+        ));
+    }
+    let cursor = (!request.page_token.is_empty())
+        .then(|| decode_machine_validation_page_token(&request.page_token))
+        .transpose()?;
+    let state = match rpc::MachineValidationRunState::try_from(request.state) {
+        Ok(rpc::MachineValidationRunState::Unspecified) => None,
+        Ok(rpc::MachineValidationRunState::Started) => Some(MachineValidationState::Started),
+        Ok(rpc::MachineValidationRunState::InProgress) => Some(MachineValidationState::InProgress),
+        Ok(rpc::MachineValidationRunState::Success) => Some(MachineValidationState::Success),
+        Ok(rpc::MachineValidationRunState::Failed) => Some(MachineValidationState::Failed),
+        Ok(rpc::MachineValidationRunState::Skipped) => Some(MachineValidationState::Skipped),
+        Err(_) => {
+            return Err(Status::invalid_argument(
+                "invalid machine validation run state",
+            ));
+        }
+    };
+    let filter = db::machine_validation::MachineValidationListFilter {
+        machine_id,
+        started_after,
+        started_before,
+        state,
+    };
+    let mut db_reader = api.db_reader();
+    let (runs, total_size, has_more) =
+        db::machine_validation::list_page(&mut db_reader, filter, cursor, page_size).await?;
+    let next_page_token = if has_more {
+        runs.last()
+            .map(encode_machine_validation_page_token)
+            .transpose()?
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    Ok(Response::new(rpc::ListMachineValidationRunsResponse {
+        runs: runs
+            .into_iter()
+            .map(rpc::MachineValidationRun::from)
+            .collect(),
+        next_page_token,
+        total_size,
+    }))
 }
 
 pub(crate) async fn find_machine_validation_run_item_ids(

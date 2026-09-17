@@ -17,6 +17,7 @@
 
 use carbide_uuid::machine::MachineId;
 use carbide_uuid::machine_validation::MachineValidationId;
+use chrono::{DateTime, Utc};
 use model::machine::machine_search_config::MachineSearchConfig;
 use model::machine::{MachineValidationContext, MachineValidationFilter};
 use model::machine_validation::{
@@ -380,6 +381,84 @@ pub async fn find_all(txn: impl DbReader<'_>) -> DatabaseResult<Vec<MachineValid
     find_by(txn, ObjectColumnFilter::<IdColumn>::All).await
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct MachineValidationListFilter {
+    pub machine_id: Option<MachineId>,
+    pub started_after: Option<DateTime<Utc>>,
+    pub started_before: Option<DateTime<Utc>>,
+    pub state: Option<MachineValidationState>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MachineValidationPageCursor {
+    pub start_time: DateTime<Utc>,
+    pub id: MachineValidationId,
+}
+
+pub async fn list_page<DB>(
+    txn: &mut DB,
+    filter: MachineValidationListFilter,
+    cursor: Option<MachineValidationPageCursor>,
+    page_size: u32,
+) -> DatabaseResult<(Vec<MachineValidation>, u64, bool)>
+where
+    for<'db> &'db mut DB: DbReader<'db>,
+{
+    let machine_id = filter.machine_id.map(|id| id.to_string());
+    let state = filter.state.map(|state| state.to_string());
+    let cursor_start_time = cursor.map(|value| value.start_time);
+    let cursor_id = cursor.map(|value| value.id);
+    let fetch_limit = i64::from(page_size) + 1;
+    let page_query = "
+        SELECT * FROM machine_validation
+        WHERE ($1::varchar IS NULL OR machine_id = $1)
+        AND ($2::timestamptz IS NULL OR start_time >= $2)
+        AND ($3::timestamptz IS NULL OR start_time < $3)
+        AND ($4::varchar IS NULL OR state = $4)
+        AND (
+            $5::timestamptz IS NULL
+            OR (start_time, id) < ($5, $6)
+        )
+        ORDER BY start_time DESC, id DESC
+        LIMIT $7";
+    let mut runs = sqlx::query_as::<_, MachineValidation>(page_query)
+        .bind(machine_id.as_deref())
+        .bind(filter.started_after)
+        .bind(filter.started_before)
+        .bind(state.as_deref())
+        .bind(cursor_start_time)
+        .bind(cursor_id)
+        .bind(fetch_limit)
+        .fetch_all(&mut *txn)
+        .await
+        .map_err(|error| DatabaseError::query(page_query, error))?;
+
+    let has_more = runs.len() > page_size as usize;
+    if has_more {
+        runs.truncate(page_size as usize);
+    }
+
+    let count_query = "
+        SELECT COUNT(*) FROM machine_validation
+        WHERE ($1::varchar IS NULL OR machine_id = $1)
+        AND ($2::timestamptz IS NULL OR start_time >= $2)
+        AND ($3::timestamptz IS NULL OR start_time < $3)
+        AND ($4::varchar IS NULL OR state = $4)";
+    let total = sqlx::query_scalar::<_, i64>(count_query)
+        .bind(machine_id.as_deref())
+        .bind(filter.started_after)
+        .bind(filter.started_before)
+        .bind(state.as_deref())
+        .fetch_one(&mut *txn)
+        .await
+        .map_err(|error| DatabaseError::query(count_query, error))?;
+    let total = u64::try_from(total).map_err(|error| {
+        DatabaseError::InvalidArgument(format!("invalid machine validation run count: {error}"))
+    })?;
+
+    Ok((runs, total, has_more))
+}
+
 pub async fn mark_machine_validation_complete(
     txn: &mut PgConnection,
     machine_id: &MachineId,
@@ -401,6 +480,8 @@ pub async fn mark_machine_validation_complete(
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+
+    use carbide_uuid::machine::{MachineIdSource, MachineType};
 
     use super::*;
 
@@ -445,6 +526,134 @@ mod tests {
             .map_err(|e| DatabaseError::query(QUERY, e))?;
 
         Ok(id)
+    }
+
+    async fn insert_list_validation(
+        txn: &mut PgConnection,
+        machine_id: MachineId,
+        start_time: chrono::DateTime<chrono::Utc>,
+        state: MachineValidationState,
+    ) -> DatabaseResult<MachineValidationId> {
+        let id = MachineValidationId::new();
+        const QUERY: &str = "
+            INSERT INTO machine_validation (
+                id,
+                machine_id,
+                start_time,
+                name,
+                context,
+                state
+            )
+            VALUES ($1, $2, $3, $4, 'OnDemand', $5)";
+        sqlx::query(QUERY)
+            .bind(id)
+            .bind(machine_id)
+            .bind(start_time)
+            .bind(format!("Test_{id}"))
+            .bind(state.to_string())
+            .execute(txn)
+            .await
+            .map_err(|error| DatabaseError::query(QUERY, error))?;
+        Ok(id)
+    }
+
+    #[crate::sqlx_test]
+    async fn list_page_is_bounded_stable_and_filterable(
+        pool: sqlx::PgPool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut txn = pool.begin().await?;
+        let now = chrono::Utc::now();
+        let first_machine = test_machine_id();
+        let second_machine = MachineId::new(
+            MachineIdSource::ProductBoardChassisSerial,
+            [2; 32],
+            MachineType::Host,
+        );
+        for (offset, machine_id, state) in [
+            (1, first_machine, MachineValidationState::Success),
+            (1, second_machine, MachineValidationState::Failed),
+            (3, first_machine, MachineValidationState::Success),
+            (4, second_machine, MachineValidationState::Skipped),
+        ] {
+            insert_list_validation(
+                txn.as_mut(),
+                machine_id,
+                now - chrono::Duration::seconds(offset),
+                state,
+            )
+            .await?;
+        }
+
+        let (first_page, total, has_more) = list_page(
+            txn.as_mut(),
+            MachineValidationListFilter::default(),
+            None,
+            2,
+        )
+        .await?;
+        assert_eq!(first_page.len(), 2);
+        assert_eq!(total, 4);
+        assert!(has_more);
+        assert_eq!(first_page[0].start_time, first_page[1].start_time);
+        assert!(first_page[0].id > first_page[1].id);
+
+        let cursor = MachineValidationPageCursor {
+            start_time: first_page[1].start_time.unwrap(),
+            id: first_page[1].id,
+        };
+        let (second_page, total, has_more) = list_page(
+            txn.as_mut(),
+            MachineValidationListFilter::default(),
+            Some(cursor),
+            2,
+        )
+        .await?;
+        assert_eq!(second_page.len(), 2);
+        assert_eq!(total, 4);
+        assert!(!has_more);
+        assert!(
+            first_page
+                .iter()
+                .all(|first| { second_page.iter().all(|second| first.id != second.id) })
+        );
+
+        let (filtered, total, has_more) = list_page(
+            txn.as_mut(),
+            MachineValidationListFilter {
+                machine_id: Some(first_machine),
+                started_after: Some(now - chrono::Duration::seconds(3)),
+                started_before: Some(now),
+                state: Some(MachineValidationState::Success),
+            },
+            None,
+            100,
+        )
+        .await?;
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(total, 2);
+        assert!(!has_more);
+        assert!(filtered.iter().all(|run| run.machine_id == first_machine));
+        assert!(filtered.iter().all(|run| {
+            run.status
+                .as_ref()
+                .is_some_and(|status| status.state == MachineValidationState::Success)
+        }));
+
+        let (failed, total, has_more) = list_page(
+            txn.as_mut(),
+            MachineValidationListFilter {
+                state: Some(MachineValidationState::Failed),
+                ..MachineValidationListFilter::default()
+            },
+            None,
+            100,
+        )
+        .await?;
+        assert_eq!(failed.len(), 1);
+        assert_eq!(total, 1);
+        assert!(!has_more);
+
+        Ok(())
     }
 
     #[crate::sqlx_test]

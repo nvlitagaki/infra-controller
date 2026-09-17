@@ -987,6 +987,11 @@ func (mcgsc *MockCoreGrpcServiceClient) GetMachineValidationRuns(ctx context.Con
 	return out, nil
 }
 
+func (mcgsc *MockCoreGrpcServiceClient) ListMachineValidationRuns(ctx context.Context, in *corev1.ListMachineValidationRunsRequest, opts ...grpc.CallOption) (*corev1.ListMachineValidationRunsResponse, error) {
+	out := new(corev1.ListMachineValidationRunsResponse)
+	return out, nil
+}
+
 func (mcgsc *MockCoreGrpcServiceClient) GetMachineValidationResults(ctx context.Context, in *corev1.MachineValidationGetRequest, opts ...grpc.CallOption) (*corev1.MachineValidationResultList, error) {
 	out := new(corev1.MachineValidationResultList)
 	return out, nil

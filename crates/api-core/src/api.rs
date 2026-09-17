@@ -2497,6 +2497,13 @@ impl Forge for Api {
         crate::handlers::machine_validation::get_machine_validation_runs(self, request).await
     }
 
+    async fn list_machine_validation_runs(
+        &self,
+        request: Request<rpc::ListMachineValidationRunsRequest>,
+    ) -> Result<Response<rpc::ListMachineValidationRunsResponse>, Status> {
+        crate::handlers::machine_validation::list_machine_validation_runs(self, request).await
+    }
+
     async fn find_machine_validation_run_item_ids(
         &self,
         request: Request<rpc::MachineValidationRunItemSearchFilter>,

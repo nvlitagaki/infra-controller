@@ -340,6 +340,7 @@ const (
 	Forge_GetMachineValidationExternalConfigs_FullMethodName                = "/forge.Forge/GetMachineValidationExternalConfigs"
 	Forge_AddUpdateMachineValidationExternalConfig_FullMethodName           = "/forge.Forge/AddUpdateMachineValidationExternalConfig"
 	Forge_GetMachineValidationRuns_FullMethodName                           = "/forge.Forge/GetMachineValidationRuns"
+	Forge_ListMachineValidationRuns_FullMethodName                          = "/forge.Forge/ListMachineValidationRuns"
 	Forge_FindMachineValidationRunItemIds_FullMethodName                    = "/forge.Forge/FindMachineValidationRunItemIds"
 	Forge_FindMachineValidationRunItemsByIds_FullMethodName                 = "/forge.Forge/FindMachineValidationRunItemsByIds"
 	Forge_GetMachineValidationAttempt_FullMethodName                        = "/forge.Forge/GetMachineValidationAttempt"
@@ -1088,6 +1089,8 @@ type ForgeClient interface {
 	AddUpdateMachineValidationExternalConfig(ctx context.Context, in *AddUpdateMachineValidationExternalConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Machine-Validation executed list
 	GetMachineValidationRuns(ctx context.Context, in *MachineValidationRunListGetRequest, opts ...grpc.CallOption) (*MachineValidationRunList, error)
+	// Bounded, cursor-paginated Machine-Validation executed list
+	ListMachineValidationRuns(ctx context.Context, in *ListMachineValidationRunsRequest, opts ...grpc.CallOption) (*ListMachineValidationRunsResponse, error)
 	// Machine-Validation run item IDs
 	FindMachineValidationRunItemIds(ctx context.Context, in *MachineValidationRunItemSearchFilter, opts ...grpc.CallOption) (*MachineValidationRunItemIdList, error)
 	// Machine-Validation run items by IDs
@@ -4626,6 +4629,16 @@ func (c *forgeClient) GetMachineValidationRuns(ctx context.Context, in *MachineV
 	return out, nil
 }
 
+func (c *forgeClient) ListMachineValidationRuns(ctx context.Context, in *ListMachineValidationRunsRequest, opts ...grpc.CallOption) (*ListMachineValidationRunsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMachineValidationRunsResponse)
+	err := c.cc.Invoke(ctx, Forge_ListMachineValidationRuns_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *forgeClient) FindMachineValidationRunItemIds(ctx context.Context, in *MachineValidationRunItemSearchFilter, opts ...grpc.CallOption) (*MachineValidationRunItemIdList, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MachineValidationRunItemIdList)
@@ -6959,6 +6972,8 @@ type ForgeServer interface {
 	AddUpdateMachineValidationExternalConfig(context.Context, *AddUpdateMachineValidationExternalConfigRequest) (*emptypb.Empty, error)
 	// Machine-Validation executed list
 	GetMachineValidationRuns(context.Context, *MachineValidationRunListGetRequest) (*MachineValidationRunList, error)
+	// Bounded, cursor-paginated Machine-Validation executed list
+	ListMachineValidationRuns(context.Context, *ListMachineValidationRunsRequest) (*ListMachineValidationRunsResponse, error)
 	// Machine-Validation run item IDs
 	FindMachineValidationRunItemIds(context.Context, *MachineValidationRunItemSearchFilter) (*MachineValidationRunItemIdList, error)
 	// Machine-Validation run items by IDs
@@ -8269,6 +8284,9 @@ func (UnimplementedForgeServer) AddUpdateMachineValidationExternalConfig(context
 }
 func (UnimplementedForgeServer) GetMachineValidationRuns(context.Context, *MachineValidationRunListGetRequest) (*MachineValidationRunList, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMachineValidationRuns not implemented")
+}
+func (UnimplementedForgeServer) ListMachineValidationRuns(context.Context, *ListMachineValidationRunsRequest) (*ListMachineValidationRunsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMachineValidationRuns not implemented")
 }
 func (UnimplementedForgeServer) FindMachineValidationRunItemIds(context.Context, *MachineValidationRunItemSearchFilter) (*MachineValidationRunItemIdList, error) {
 	return nil, status.Error(codes.Unimplemented, "method FindMachineValidationRunItemIds not implemented")
@@ -14524,6 +14542,24 @@ func _Forge_GetMachineValidationRuns_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Forge_ListMachineValidationRuns_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMachineValidationRunsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ForgeServer).ListMachineValidationRuns(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Forge_ListMachineValidationRuns_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ForgeServer).ListMachineValidationRuns(ctx, req.(*ListMachineValidationRunsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Forge_FindMachineValidationRunItemIds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(MachineValidationRunItemSearchFilter)
 	if err := dec(in); err != nil {
@@ -18955,6 +18991,10 @@ var Forge_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMachineValidationRuns",
 			Handler:    _Forge_GetMachineValidationRuns_Handler,
+		},
+		{
+			MethodName: "ListMachineValidationRuns",
+			Handler:    _Forge_ListMachineValidationRuns_Handler,
 		},
 		{
 			MethodName: "FindMachineValidationRunItemIds",
