@@ -592,16 +592,16 @@ async fn get_bmc_ip_from_host_id(
     // Get machine details from API
     let machine = api_client.get_machine(machine_id).await?;
 
-    // Extract BMC info
-    let bmc_info = machine.bmc.ok_or_else(|| {
+    // Extract the BMC endpoint
+    let bmc_endpoint = machine.bmc.ok_or_else(|| {
         CarbideCliError::GenericError(format!(
-            "Machine {} does not have BMC info available",
+            "Machine {} does not have BMC endpoint available",
             host_id
         ))
     })?;
 
     // Extract BMC IP (required)
-    let bmc_ip = bmc_info.ip.ok_or_else(|| {
+    let bmc_ip = bmc_endpoint.ip.ok_or_else(|| {
         CarbideCliError::GenericError(format!(
             "Machine {} does not have BMC IP address available",
             host_id
@@ -609,7 +609,7 @@ async fn get_bmc_ip_from_host_id(
     })?;
 
     // Extract BMC MAC (optional)
-    let bmc_mac = bmc_info.mac;
+    let bmc_mac = bmc_endpoint.mac;
 
     Ok((bmc_ip, bmc_mac))
 }
@@ -619,7 +619,10 @@ async fn get_site_controller_analysis(
     api_client: &ApiClient,
     host_id: &str,
 ) -> CarbideCliResult<SiteControllerAnalysis> {
-    println!("   Fetching BMC information for machine {}...", host_id);
+    println!(
+        "   Fetching BMC endpoint details for machine {}...",
+        host_id
+    );
 
     // Step 1: Get BMC IP and MAC from machine_id
     let (bmc_ip, bmc_mac) = get_bmc_ip_from_host_id(api_client, host_id).await?;
@@ -1587,8 +1590,8 @@ impl<'a> ZipBundleCreator<'a> {
 
         let report = &analysis.exploration_report;
 
-        // Format BMC information
-        let bmc_info = json!({
+        // Format BMC endpoint details
+        let bmc_endpoint = json!({
             "ip": analysis.bmc_ip,
             "mac": analysis.bmc_mac,
         });
@@ -1682,7 +1685,7 @@ impl<'a> ZipBundleCreator<'a> {
         // Create final JSON structure
         let json_output = json!({
             "host_id": self.config.host_id,
-            "bmc": bmc_info,
+            "bmc": bmc_endpoint,
             "credentials": credentials_info,
             "redfish_exploration": redfish_exploration_info,
         });

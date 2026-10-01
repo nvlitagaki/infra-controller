@@ -167,7 +167,7 @@ impl From<Machine> for ManagedHostOutput {
             })
             .unwrap_or((None, None));
 
-        let BmcInfoDisplay {
+        let BmcDisplay {
             ip: host_bmc_ip,
             mac: host_bmc_mac,
             version: host_bmc_version,
@@ -378,7 +378,7 @@ impl ManagedHostAttachedDpu {
             None => (None, None),
         };
 
-        let BmcInfoDisplay {
+        let BmcDisplay {
             ip: bmc_ip,
             mac: bmc_mac,
             version: bmc_version,
@@ -471,7 +471,7 @@ pub fn get_managed_host_output(source: ManagedHostMetadata) -> Vec<ManagedHostOu
                     let dpu_exploration_report = dpu
                         .bmc
                         .as_ref()
-                        .and_then(|bmc_info| bmc_info.ip.as_ref())
+                        .and_then(|bmc_endpoint| bmc_endpoint.ip.as_ref())
                         .and_then(|ip| index.exploration_reports_by_address.remove(ip));
 
                     let switch_connections = index
@@ -630,16 +630,16 @@ pub fn to_time<M: Display>(t: Option<Timestamp>, machine_id: Option<M>) -> Optio
     }
 }
 
-/// Optional BMC fields for display, without cloning.
+/// BMC endpoint and status fields for display, without cloning.
 #[derive(Default)]
-struct BmcInfoDisplay {
+struct BmcDisplay {
     ip: Option<String>,
     mac: Option<String>,
     version: Option<String>,
     firmware_version: Option<String>,
 }
 
-impl From<(Option<BmcEndpoint>, Option<BmcStatus>)> for BmcInfoDisplay {
+impl From<(Option<BmcEndpoint>, Option<BmcStatus>)> for BmcDisplay {
     fn from((endpoint, status): (Option<BmcEndpoint>, Option<BmcStatus>)) -> Self {
         let endpoint = endpoint.unwrap_or_default();
         let status = status.unwrap_or_default();

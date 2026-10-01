@@ -366,7 +366,7 @@ func (c *grpcClient) GetSwitches(ctx context.Context) ([]ObservedControllerDevic
 		for _, sw := range batch {
 			result = append(result, ObservedControllerDevice{
 				ID:     sw.GetId().GetId(),
-				BmcMac: sw.GetBmcInfo().GetMac(),
+				BmcMac: sw.GetBmcInfo().GetMac(), //nolint:staticcheck // Preserve compatibility with Core versions before the BMC split.
 			})
 		}
 		return nil
@@ -401,7 +401,7 @@ func (c *grpcClient) GetPowerShelves(ctx context.Context) ([]ObservedControllerD
 		for _, shelf := range batch {
 			result = append(result, ObservedControllerDevice{
 				ID:     shelf.GetId().GetId(),
-				BmcMac: shelf.GetBmcInfo().GetMac(),
+				BmcMac: shelf.GetBmcInfo().GetMac(), //nolint:staticcheck // Preserve compatibility with Core versions before the BMC split.
 			})
 		}
 		return nil

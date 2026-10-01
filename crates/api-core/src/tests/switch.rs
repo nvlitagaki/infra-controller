@@ -55,7 +55,7 @@ async fn test_find_switch_by_id(pool: sqlx::PgPool) -> Result<(), Box<dyn std::e
     assert_eq!(found_switch.status.as_ref().unwrap().serial_number, None);
 
     let bmc_ip = found_switch
-        .bmc_info
+        .bmc
         .as_ref()
         .unwrap()
         .ip
@@ -637,7 +637,7 @@ async fn test_new_switch_fixture(pool: sqlx::PgPool) -> Result<(), Box<dyn std::
 }
 
 #[crate::sqlx_test]
-async fn test_find_switch_bmc_info_no_matching_data(
+async fn test_find_switch_bmc_endpoint_no_matching_data(
     pool: sqlx::PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let env = create_test_env(pool).await;
@@ -685,8 +685,8 @@ async fn test_find_switch_bmc_info_no_matching_data(
 
     let found_switch = &switch_list.switches[0];
     assert!(
-        found_switch.bmc_info.is_none(),
-        "bmc_info should be None when no expected switch data exists"
+        found_switch.bmc.is_none(),
+        "bmc should be None when no expected switch data exists"
     );
 
     Ok(())

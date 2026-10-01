@@ -53,17 +53,17 @@ fn show_power_shelves(power_shelves: Vec<PowerShelf>, output_format: OutputForma
                 .unwrap_or("N/A");
 
             let bmc_ip = shelf
-                .bmc_info
+                .bmc
                 .as_ref()
                 .and_then(|b| b.ip.clone())
                 .unwrap_or_else(|| "N/A".to_string());
             let bmc_mac = shelf
-                .bmc_info
+                .bmc
                 .as_ref()
                 .and_then(|b| b.mac.clone())
                 .unwrap_or_else(|| "N/A".to_string());
             let bmc_interface_id = shelf
-                .bmc_info
+                .bmc
                 .as_ref()
                 .and_then(|b| b.machine_interface_id.map(|id| id.to_string()))
                 .unwrap_or_else(|| "N/A".to_string());

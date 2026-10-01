@@ -101,6 +101,7 @@ impl TryFrom<PowerShelf> for rpc::PowerShelf {
                 health: Some(health.into()),
                 health_sources,
                 lifecycle: Some(lifecycle),
+                bmc_status: src.bmc_info.as_ref().map(Into::into),
             },
             None => rpc::PowerShelfStatus {
                 state_reason: None,
@@ -115,6 +116,7 @@ impl TryFrom<PowerShelf> for rpc::PowerShelf {
                 health: Some(health.into()),
                 health_sources,
                 lifecycle: Some(lifecycle),
+                bmc_status: src.bmc_info.as_ref().map(Into::into),
             },
         });
 
@@ -134,6 +136,8 @@ impl TryFrom<PowerShelf> for rpc::PowerShelf {
             controller_state,
             metadata: Some(src.metadata.into()),
             version: src.version.version_string(),
+            bmc: src.bmc_info.as_ref().map(Into::into),
+            #[allow(deprecated)] // Preserve compatibility with clients using the combined field.
             bmc_info: src.bmc_info.map(Into::into),
             state_version,
             rack_id: src.rack_id,
@@ -200,6 +204,50 @@ mod tests {
             version: ConfigVersion::initial(),
             health_reports: Default::default(),
         };
+
+        let bmc_info = model::bmc_info::BmcInfo {
+            ip: Some("2001:db8::10".parse().unwrap()),
+            mac: Some("02:03:04:05:06:07".parse().unwrap()),
+            port: Some(8443),
+            machine_interface_id: Some(uuid::Uuid::from_u128(42).into()),
+            version: Some("2.0".to_string()),
+            firmware_version: Some("24.10".to_string()),
+        };
+        for (scenario, bmc_info, status) in [
+            (
+                "discovered with resource status",
+                Some(bmc_info.clone()),
+                power_shelf.status.clone(),
+            ),
+            ("discovered without resource status", Some(bmc_info), None),
+            ("no discovery information", None, None),
+        ] {
+            let mut source = power_shelf.clone();
+            source.bmc_info = bmc_info.clone();
+            source.status = status;
+            let converted = rpc::PowerShelf::try_from(source).unwrap();
+            assert_eq!(
+                converted.bmc,
+                bmc_info.as_ref().map(|_| rpc::BmcEndpoint {
+                    ip: Some("2001:db8::10".to_string()),
+                    mac: Some("02:03:04:05:06:07".to_string()),
+                    port: Some(8443),
+                    machine_interface_id: Some(uuid::Uuid::from_u128(42).into()),
+                }),
+                "{scenario}",
+            );
+            assert_eq!(
+                converted.status.unwrap().bmc_status,
+                bmc_info.as_ref().map(|_| rpc::BmcStatus {
+                    version: Some("2.0".to_string()),
+                    firmware_version: Some("24.10".to_string()),
+                }),
+                "{scenario}",
+            );
+            #[allow(deprecated)] // Verify the compatibility field remains populated.
+            let legacy = converted.bmc_info;
+            assert_eq!(legacy, bmc_info.map(Into::into), "{scenario}");
+        }
 
         let rpc_power_shelf = rpc::PowerShelf::try_from(power_shelf)?;
 

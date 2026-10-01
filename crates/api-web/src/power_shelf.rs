@@ -115,7 +115,8 @@ struct PowerShelfDetail {
     name: String,
     capacity: String,
     voltage: String,
-    bmc_info: Option<rpc::forge::BmcInfo>,
+    bmc: Option<rpc::forge::BmcEndpoint>,
+    bmc_status: Option<rpc::forge::BmcStatus>,
     metadata_detail: super::MetadataDetail,
     health_detail: super::HealthDetail,
     history: StateHistoryTable,
@@ -163,7 +164,8 @@ impl PowerShelfDetail {
                 .voltage
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "N/A".to_string()),
-            bmc_info: shelf.bmc_info,
+            bmc: shelf.bmc,
+            bmc_status: shelf.status.and_then(|status| status.bmc_status),
             metadata_detail,
             health_detail,
             history,
@@ -241,7 +243,7 @@ async fn fetch_power_shelf(
 
 async fn fetch_power_shelves(api: &Api) -> Result<rpc::forge::PowerShelfList, tonic::Status> {
     // Use find_power_shelf_ids (which respects DeletedFilter::Exclude by default)
-    // followed by find_power_shelves_by_ids (which also fetches BMC info).
+    // followed by find_power_shelves_by_ids (which also fetches BMC endpoints and status).
     let power_shelf_ids = api
         .find_power_shelf_ids(tonic::Request::new(
             rpc::forge::PowerShelfSearchFilter::default(),
