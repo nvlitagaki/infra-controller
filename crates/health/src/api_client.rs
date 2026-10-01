@@ -367,10 +367,8 @@ fn machine_data(machine: &rpc::forge::Machine) -> MachineData {
     }
 }
 
-fn inventory_bmc_mac(bmc_info: Option<&rpc::forge::BmcInfo>) -> Option<MacAddress> {
-    bmc_info
-        .and_then(|info| info.mac.as_deref())
-        .and_then(|mac| MacAddress::from_str(mac).ok())
+fn inventory_bmc_mac(mac: Option<&str>) -> Option<MacAddress> {
+    mac.and_then(|mac| MacAddress::from_str(mac).ok())
 }
 
 fn machine_component_inventory(
@@ -391,7 +389,7 @@ fn machine_component_inventory(
             machine_id: Some(machine_id),
             ..machine_data(machine)
         }),
-        bmc_mac: inventory_bmc_mac(machine.bmc_info.as_ref()),
+        bmc_mac: inventory_bmc_mac(machine.bmc.as_ref().and_then(|bmc| bmc.mac.as_deref())),
     }))
 }
 
@@ -413,7 +411,7 @@ fn switch_component_inventory(
             id: Some(switch_id),
             ..switch_data(switch, SwitchEndpointRole::Bmc, false)
         }),
-        bmc_mac: inventory_bmc_mac(switch.bmc_info.as_ref()),
+        bmc_mac: inventory_bmc_mac(switch.bmc_info.as_ref().and_then(|bmc| bmc.mac.as_deref())),
     }))
 }
 
@@ -438,7 +436,12 @@ fn power_shelf_component_inventory(
                 .nvlink_domain_uuid
                 .filter(|domain_uuid| domain_uuid != &NvLinkDomainId::nil()),
         }),
-        bmc_mac: inventory_bmc_mac(power_shelf.bmc_info.as_ref()),
+        bmc_mac: inventory_bmc_mac(
+            power_shelf
+                .bmc_info
+                .as_ref()
+                .and_then(|bmc| bmc.mac.as_deref()),
+        ),
     }))
 }
 
@@ -892,7 +895,7 @@ impl ApiEndpointSource {
         &self,
         machine: &rpc::forge::Machine,
     ) -> Result<Arc<BmcEndpoint>, HealthError> {
-        let Some(bmc_info) = &machine.bmc_info else {
+        let Some(bmc_info) = &machine.bmc else {
             return Err(HealthError::GenericError(
                 "Could not extract machine endpoint without BMC Info".to_string(),
             ));
@@ -1095,28 +1098,47 @@ impl TryFrom<&rpc::forge::BmcInfo> for BmcAddr {
     type Error = HealthError;
 
     fn try_from(bmc_info: &rpc::forge::BmcInfo) -> Result<Self, Self::Error> {
-        let ip = bmc_info
-            .ip
-            .as_ref()
-            .ok_or_else(|| HealthError::GenericError("missing BMC IP address".to_string()))?
-            .parse::<IpAddr>()
-            .map_err(|error| HealthError::GenericError(error.to_string()))?;
-        let mac = bmc_info
-            .mac
-            .as_ref()
-            .ok_or_else(|| HealthError::GenericError("missing BMC MAC address".to_string()))
-            .and_then(|mac| {
-                MacAddress::from_str(mac)
-                    .map_err(|error| HealthError::GenericError(error.to_string()))
-            })?;
-        let port = bmc_info.port.map(|port| port.try_into().unwrap_or(443));
-
-        Ok(Self {
-            ip,
-            port,
-            mac: Some(mac),
-        })
+        bmc_addr(
+            bmc_info.ip.as_deref(),
+            bmc_info.mac.as_deref(),
+            bmc_info.port,
+        )
     }
+}
+
+impl TryFrom<&rpc::forge::BmcEndpoint> for BmcAddr {
+    type Error = HealthError;
+
+    fn try_from(endpoint: &rpc::forge::BmcEndpoint) -> Result<Self, Self::Error> {
+        bmc_addr(
+            endpoint.ip.as_deref(),
+            endpoint.mac.as_deref(),
+            endpoint.port,
+        )
+    }
+}
+
+fn bmc_addr(
+    ip: Option<&str>,
+    mac: Option<&str>,
+    port: Option<u32>,
+) -> Result<BmcAddr, HealthError> {
+    let ip = ip
+        .ok_or_else(|| HealthError::GenericError("missing BMC IP address".to_string()))?
+        .parse::<IpAddr>()
+        .map_err(|error| HealthError::GenericError(error.to_string()))?;
+    let mac = mac
+        .ok_or_else(|| HealthError::GenericError("missing BMC MAC address".to_string()))
+        .and_then(|mac| {
+            MacAddress::from_str(mac).map_err(|error| HealthError::GenericError(error.to_string()))
+        })?;
+    let port = port.map(|port| port.try_into().unwrap_or(443));
+
+    Ok(BmcAddr {
+        ip,
+        port,
+        mac: Some(mac),
+    })
 }
 
 impl TryFrom<&rpc::forge::SwitchNvosInfo> for BmcAddr {
@@ -1311,12 +1333,45 @@ mod tests {
     }
 
     #[test]
+    fn machine_endpoint_and_inventory_use_structured_bmc() {
+        let source = ApiEndpointSource::new(
+            Arc::new(ApiClientWrapper::new(
+                "test-ca.pem".to_string(),
+                "test-client.pem".to_string(),
+                "test-client-key.pem".to_string(),
+                &Url::parse("https://127.0.0.1:1079").expect("valid API URL"),
+            )),
+            reqwest(),
+            None,
+            10,
+            None,
+        );
+        let machine = rpc::forge::Machine {
+            id: Some(test_machine_id()),
+            rack_id: Some(RackId::new("RACK_1")),
+            bmc: Some(rpc::forge::BmcEndpoint {
+                ip: Some("2001:db8::10".to_string()),
+                mac: Some(test_mac().to_string()),
+                port: Some(8443),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let endpoint = source.extract_machine_endpoint(&machine).unwrap();
+        assert_eq!(endpoint.addr.ip, "2001:db8::10".parse::<IpAddr>().unwrap());
+        assert_eq!(endpoint.addr.port, Some(8443));
+        assert_eq!(endpoint.addr.mac, Some(test_mac()));
+        let inventory = machine_component_inventory(&machine).unwrap().unwrap();
+        assert_eq!(inventory.bmc_mac, Some(test_mac()));
+    }
+
+    #[test]
     fn authoritative_component_inventory_does_not_require_bmc_endpoint() {
         let rack_id = RackId::new("RACK_1");
         let machine = machine_component_inventory(&rpc::forge::Machine {
             id: Some(test_machine_id()),
             rack_id: Some(rack_id.clone()),
-            bmc_info: Some(rpc::forge::BmcInfo {
+            bmc: Some(rpc::forge::BmcEndpoint {
                 mac: Some("not-a-mac".to_string()),
                 ..Default::default()
             }),

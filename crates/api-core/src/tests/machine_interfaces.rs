@@ -961,7 +961,7 @@ async fn machine_bmc_info_uses_bmc_interface_and_interfaces_exclude_it(
     let dpu_bmc_interface_ip = dpu_bmc_interface_ip.to_string();
 
     let host_bmc_info = host_rpc_machine
-        .bmc_info
+        .bmc
         .as_ref()
         .expect("host RPC BMC info must exist");
     assert_eq!(
@@ -988,7 +988,7 @@ async fn machine_bmc_info_uses_bmc_interface_and_interfaces_exclude_it(
     );
 
     let dpu_bmc_info = dpu_rpc_machine
-        .bmc_info
+        .bmc
         .as_ref()
         .expect("DPU RPC BMC info must exist");
     assert_eq!(

@@ -153,7 +153,7 @@ async fn metadata_from_expected_machine(
     }
     let machine = machines.remove(0);
     let bmc_mac: MacAddress = machine
-        .bmc_info
+        .bmc
         .and_then(|bmc_info| bmc_info.mac)
         .map(|mac| mac.parse())
         .transpose()

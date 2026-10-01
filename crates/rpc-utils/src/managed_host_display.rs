@@ -28,8 +28,8 @@ use itertools::Itertools;
 use rpc::common::DpuMachineIdList;
 // use rpc::forge::forge_server::Forge;
 use rpc::forge::{
-    BmcInfo, ConnectedDevice, GetSiteExplorationRequest, MachineType, ManagedHostQuarantineState,
-    NetworkDevice, NetworkDeviceIdList,
+    BmcEndpoint, BmcStatus, ConnectedDevice, GetSiteExplorationRequest, MachineType,
+    ManagedHostQuarantineState, NetworkDevice, NetworkDeviceIdList,
 };
 use rpc::machine_discovery::MemoryDeviceGroup;
 use rpc::site_explorer::{EndpointExplorationReport, ExploredEndpoint};
@@ -172,7 +172,7 @@ impl From<Machine> for ManagedHostOutput {
             mac: host_bmc_mac,
             version: host_bmc_version,
             firmware_version: host_bmc_firmware_version,
-        } = machine.bmc_info.into();
+        } = (machine.bmc, status.bmc_status).into();
 
         let discovery_info = status.discovery_info;
         let host_gpu_count = discovery_info
@@ -383,7 +383,7 @@ impl ManagedHostAttachedDpu {
             mac: bmc_mac,
             version: bmc_version,
             firmware_version: bmc_firmware_version,
-        } = dpu_machine.bmc_info.into();
+        } = (dpu_machine.bmc, status.bmc_status).into();
 
         let DmiDataDisplay {
             product_serial: serial_number,
@@ -469,7 +469,7 @@ pub fn get_managed_host_output(source: ManagedHostMetadata) -> Vec<ManagedHostOu
                 })
                 .map(|(dpu_id, dpu)| {
                     let dpu_exploration_report = dpu
-                        .bmc_info
+                        .bmc
                         .as_ref()
                         .and_then(|bmc_info| bmc_info.ip.as_ref())
                         .and_then(|ip| index.exploration_reports_by_address.remove(ip));
@@ -630,7 +630,7 @@ pub fn to_time<M: Display>(t: Option<Timestamp>, machine_id: Option<M>) -> Optio
     }
 }
 
-/// Helper to easily turn an Option<BmcInfo> into optional fields for display, without cloning
+/// Optional BMC fields for display, without cloning.
 #[derive(Default)]
 struct BmcInfoDisplay {
     ip: Option<String>,
@@ -639,17 +639,15 @@ struct BmcInfoDisplay {
     firmware_version: Option<String>,
 }
 
-impl From<Option<BmcInfo>> for BmcInfoDisplay {
-    fn from(value: Option<BmcInfo>) -> Self {
-        if let Some(bmc_info) = value {
-            Self {
-                ip: bmc_info.ip.none_if_empty(),
-                mac: bmc_info.mac.none_if_empty(),
-                version: bmc_info.version.none_if_empty(),
-                firmware_version: bmc_info.firmware_version.none_if_empty(),
-            }
-        } else {
-            Self::default()
+impl From<(Option<BmcEndpoint>, Option<BmcStatus>)> for BmcInfoDisplay {
+    fn from((endpoint, status): (Option<BmcEndpoint>, Option<BmcStatus>)) -> Self {
+        let endpoint = endpoint.unwrap_or_default();
+        let status = status.unwrap_or_default();
+        Self {
+            ip: endpoint.ip.none_if_empty(),
+            mac: endpoint.mac.none_if_empty(),
+            version: status.version.none_if_empty(),
+            firmware_version: status.firmware_version.none_if_empty(),
         }
     }
 }
@@ -775,6 +773,62 @@ mod tests {
         })
         .host_memory;
         assert_eq!(host_memory, Some("32 GiB (16 GiBx2)".to_string()));
+    }
+
+    #[test]
+    fn machine_displays_use_bmc_endpoint_and_status() {
+        for (scenario, bmc, bmc_status, expected) in [
+            (
+                "populated BMC fields",
+                Some(BmcEndpoint {
+                    ip: Some("192.0.2.10".to_string()),
+                    mac: Some("02:03:04:05:06:07".to_string()),
+                    ..Default::default()
+                }),
+                Some(BmcStatus {
+                    version: Some("2.0".to_string()),
+                    firmware_version: Some("24.10".to_string()),
+                }),
+                (
+                    Some("192.0.2.10"),
+                    Some("02:03:04:05:06:07"),
+                    Some("2.0"),
+                    Some("24.10"),
+                ),
+            ),
+            ("missing BMC fields", None, None, (None, None, None, None)),
+        ] {
+            let machine = Machine {
+                bmc,
+                status: Some(rpc::forge::MachineStatus {
+                    bmc_status,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            let host = ManagedHostOutput::from(machine.clone());
+            let dpu = ManagedHostAttachedDpu::new_from_dpu_machine(machine, vec![], None, true);
+            assert_eq!(
+                (
+                    host.host_bmc_ip.as_deref(),
+                    host.host_bmc_mac.as_deref(),
+                    host.host_bmc_version.as_deref(),
+                    host.host_bmc_firmware_version.as_deref()
+                ),
+                expected,
+                "{scenario}: host display"
+            );
+            assert_eq!(
+                (
+                    dpu.bmc_ip.as_deref(),
+                    dpu.bmc_mac.as_deref(),
+                    dpu.bmc_version.as_deref(),
+                    dpu.bmc_firmware_version.as_deref()
+                ),
+                expected,
+                "{scenario}: DPU display"
+            );
+        }
     }
 
     #[test]

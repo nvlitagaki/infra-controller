@@ -97,7 +97,7 @@ impl From<Machine> for DpuVersions {
             dpu_type,
             state,
             firmware_version,
-            bmc_version: machine.bmc_info.and_then(|bmc| bmc.firmware_version),
+            bmc_version: status.bmc_status.and_then(|bmc| bmc.firmware_version),
             bios_version,
             hbn_version: machine.inventory.and_then(|inv| {
                 inv.components

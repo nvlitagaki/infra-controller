@@ -95,7 +95,7 @@ async fn failed_claim_commit_does_not_dispatch_and_same_action_can_retry(pool: P
         .host()
         .rpc_machine()
         .await
-        .bmc_info
+        .bmc
         .expect("host BMC")
         .ip()
         .to_string();

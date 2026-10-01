@@ -305,7 +305,7 @@ async fn test_admin_force_delete_dpu_and_host_by_host_machine_id(pool: sqlx::PgP
                 .await
                 .first()
                 .unwrap()
-                .bmc_info
+                .bmc
                 .as_ref()
                 .unwrap()
                 .ip
@@ -318,7 +318,7 @@ async fn test_admin_force_delete_dpu_and_host_by_host_machine_id(pool: sqlx::PgP
                 .await
                 .first()
                 .unwrap()
-                .bmc_info
+                .bmc
                 .as_ref()
                 .unwrap()
                 .ip

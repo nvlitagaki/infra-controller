@@ -658,9 +658,9 @@ func NewAPIMachine(dbm *cdbm.Machine, dbmcs []cdbm.MachineCapability, dbmis []cd
 		machine := dbm.Metadata
 		discoveryInfo := machine.GetStatus().GetDiscoveryInfo()
 		// BMCInfo
-		if machine.BmcInfo != nil {
+		if machine.BmcInfo != nil { //nolint:staticcheck // Older Core versions expose BMC data only through this field.
 			apim.Metadata.BMCInfo = &APIBMCInfo{}
-			apim.Metadata.BMCInfo.FromProto(machine.BmcInfo)
+			apim.Metadata.BMCInfo.FromProto(machine.BmcInfo) //nolint:staticcheck // Preserve compatibility with Core versions before the BMC split.
 		}
 
 		if discoveryInfo != nil {

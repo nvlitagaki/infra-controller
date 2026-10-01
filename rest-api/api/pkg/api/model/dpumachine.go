@@ -506,9 +506,9 @@ func (apd *APIDpuMachine) FromProto(protoDpuMachine *corev1.DpuMachine, ctx APID
 		apd.DpuAgentVersion = *protoMachineStatus.DpuAgentVersion
 	}
 
-	if protoMachine.BmcInfo != nil {
+	if protoMachine.BmcInfo != nil { //nolint:staticcheck // Older Core versions expose BMC data only through this field.
 		apd.BMCInfo = &APIBMCInfo{}
-		apd.BMCInfo.FromProto(protoMachine.BmcInfo)
+		apd.BMCInfo.FromProto(protoMachine.BmcInfo) //nolint:staticcheck // Preserve compatibility with Core versions before the BMC split.
 	}
 
 	if protoMachineStatus.GetDiscoveryInfo() != nil && protoMachineStatus.GetDiscoveryInfo().DmiData != nil {

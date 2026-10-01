@@ -430,8 +430,8 @@ func TestMachine_NewAPIMachine(t *testing.T) {
 
 	if apimi.Metadata != nil {
 		if apimi.Metadata.BMCInfo != nil {
-			assert.Equal(t, *apimi.Metadata.BMCInfo.IP, *machineInfo1.Machine.BmcInfo.Ip)
-			assert.Equal(t, *apimi.Metadata.BMCInfo.Mac, *machineInfo1.Machine.BmcInfo.Mac)
+			assert.Equal(t, *apimi.Metadata.BMCInfo.IP, *machineInfo1.Machine.BmcInfo.Ip)   //nolint:staticcheck // Verify the legacy Core response fixture.
+			assert.Equal(t, *apimi.Metadata.BMCInfo.Mac, *machineInfo1.Machine.BmcInfo.Mac) //nolint:staticcheck // Verify the legacy Core response fixture.
 		}
 
 		if apimi.Metadata.DMIData != nil {
