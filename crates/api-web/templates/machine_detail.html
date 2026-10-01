@@ -100,7 +100,7 @@
 		</td></tr>
 		{% endif %}
 	</table>
-	{% if has_complete_bmc_info %}
+	{% if has_complete_bmc_endpoint %}
 	<form method="POST" action="/admin/machine/{{ id }}/boot-interface/reconcile">
 		<span class="action-spinner"></span>
 		<input type="submit" value="Request reconciliation">

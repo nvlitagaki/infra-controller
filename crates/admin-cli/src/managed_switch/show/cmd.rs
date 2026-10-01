@@ -129,10 +129,12 @@ fn build_managed_switch_outputs(
             bmc_mac: linked_switch.bmc_mac_address.clone(),
             bmc_ip: linked_switch.explored_endpoint_address.clone(),
             bmc_version: switch
-                .and_then(|s| s.bmc_info.as_ref())
+                .and_then(|s| s.status.as_ref())
+                .and_then(|s| s.bmc_status.as_ref())
                 .and_then(|b| b.version.clone()),
             bmc_firmware_version: switch
-                .and_then(|s| s.bmc_info.as_ref())
+                .and_then(|s| s.status.as_ref())
+                .and_then(|s| s.bmc_status.as_ref())
                 .and_then(|b| b.firmware_version.clone()),
             nvos_mac_addresses: nvos_macs,
             controller_state: switch
@@ -189,15 +191,20 @@ fn build_managed_switch_outputs(
                 .unwrap_or_default(),
             serial_number: String::new(),
             bmc_mac: switch
-                .bmc_info
+                .bmc
                 .as_ref()
                 .and_then(|b| b.mac.clone())
                 .unwrap_or_default(),
-            bmc_ip: switch.bmc_info.as_ref().and_then(|b| b.ip.clone()),
-            bmc_version: switch.bmc_info.as_ref().and_then(|b| b.version.clone()),
-            bmc_firmware_version: switch
-                .bmc_info
+            bmc_ip: switch.bmc.as_ref().and_then(|b| b.ip.clone()),
+            bmc_version: switch
+                .status
                 .as_ref()
+                .and_then(|s| s.bmc_status.as_ref())
+                .and_then(|b| b.version.clone()),
+            bmc_firmware_version: switch
+                .status
+                .as_ref()
+                .and_then(|s| s.bmc_status.as_ref())
                 .and_then(|b| b.firmware_version.clone()),
             nvos_mac_addresses: nvos_macs,
             controller_state: switch.controller_state.clone(),

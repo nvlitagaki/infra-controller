@@ -142,6 +142,7 @@ impl TryFrom<Switch> for rpc::Switch {
                         health: Some(health.into()),
                         health_sources,
                         lifecycle: Some(lifecycle),
+                        bmc_status: src.bmc_info.as_ref().map(Into::into),
                         fabric_manager_status,
                         fabric_manager_status_details,
                         nvos_ports: Vec::new(),
@@ -157,6 +158,7 @@ impl TryFrom<Switch> for rpc::Switch {
                     health: Some(health.into()),
                     health_sources,
                     lifecycle: Some(lifecycle),
+                    bmc_status: src.bmc_info.as_ref().map(Into::into),
                     fabric_manager_status,
                     fabric_manager_status_details,
                     nvos_ports: Vec::new(),
@@ -188,6 +190,8 @@ impl TryFrom<Switch> for rpc::Switch {
             status,
             deleted,
             controller_state,
+            bmc: src.bmc_info.as_ref().map(Into::into),
+            #[allow(deprecated)] // Preserve compatibility with clients using the combined field.
             bmc_info: src.bmc_info.map(Into::into),
             #[allow(deprecated)]
             nvos_info: None,
@@ -273,6 +277,50 @@ mod tests {
             tray_index: Some(2),
             health_reports: Default::default(),
         };
+
+        let bmc_info = model::bmc_info::BmcInfo {
+            ip: Some("2001:db8::10".parse().unwrap()),
+            mac: Some("02:03:04:05:06:07".parse().unwrap()),
+            port: Some(8443),
+            machine_interface_id: Some(uuid::Uuid::from_u128(42).into()),
+            version: Some("2.0".to_string()),
+            firmware_version: Some("24.10".to_string()),
+        };
+        for (scenario, bmc_info, status) in [
+            (
+                "discovered with resource status",
+                Some(bmc_info.clone()),
+                switch.status.clone(),
+            ),
+            ("discovered without resource status", Some(bmc_info), None),
+            ("no discovery information", None, None),
+        ] {
+            let mut source = switch.clone();
+            source.bmc_info = bmc_info.clone();
+            source.status = status;
+            let converted = rpc::Switch::try_from(source).unwrap();
+            assert_eq!(
+                converted.bmc,
+                bmc_info.as_ref().map(|_| rpc::BmcEndpoint {
+                    ip: Some("2001:db8::10".to_string()),
+                    mac: Some("02:03:04:05:06:07".to_string()),
+                    port: Some(8443),
+                    machine_interface_id: Some(uuid::Uuid::from_u128(42).into()),
+                }),
+                "{scenario}",
+            );
+            assert_eq!(
+                converted.status.unwrap().bmc_status,
+                bmc_info.as_ref().map(|_| rpc::BmcStatus {
+                    version: Some("2.0".to_string()),
+                    firmware_version: Some("24.10".to_string()),
+                }),
+                "{scenario}",
+            );
+            #[allow(deprecated)] // Verify the compatibility field remains populated.
+            let legacy = converted.bmc_info;
+            assert_eq!(legacy, bmc_info.map(Into::into), "{scenario}");
+        }
 
         let rpc_switch: rpc::Switch = switch.try_into().unwrap();
         let status = rpc_switch.status.expect("status should be Some");

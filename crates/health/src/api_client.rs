@@ -411,7 +411,7 @@ fn switch_component_inventory(
             id: Some(switch_id),
             ..switch_data(switch, SwitchEndpointRole::Bmc, false)
         }),
-        bmc_mac: inventory_bmc_mac(switch.bmc_info.as_ref().and_then(|bmc| bmc.mac.as_deref())),
+        bmc_mac: inventory_bmc_mac(switch.bmc.as_ref().and_then(|bmc| bmc.mac.as_deref())),
     }))
 }
 
@@ -436,12 +436,7 @@ fn power_shelf_component_inventory(
                 .nvlink_domain_uuid
                 .filter(|domain_uuid| domain_uuid != &NvLinkDomainId::nil()),
         }),
-        bmc_mac: inventory_bmc_mac(
-            power_shelf
-                .bmc_info
-                .as_ref()
-                .and_then(|bmc| bmc.mac.as_deref()),
-        ),
+        bmc_mac: inventory_bmc_mac(power_shelf.bmc.as_ref().and_then(|bmc| bmc.mac.as_deref())),
     }))
 }
 
@@ -895,12 +890,12 @@ impl ApiEndpointSource {
         &self,
         machine: &rpc::forge::Machine,
     ) -> Result<Arc<BmcEndpoint>, HealthError> {
-        let Some(bmc_info) = &machine.bmc else {
+        let Some(bmc_endpoint) = &machine.bmc else {
             return Err(HealthError::GenericError(
-                "Could not extract machine endpoint without BMC Info".to_string(),
+                "Could not extract machine endpoint without a BMC endpoint".to_string(),
             ));
         };
-        let addr = BmcAddr::try_from(bmc_info)?;
+        let addr = BmcAddr::try_from(bmc_endpoint)?;
         let metadata = machine
             .id
             .map(|_| EndpointMetadata::Machine(machine_data(machine)));
@@ -917,12 +912,12 @@ impl ApiEndpointSource {
         &self,
         switch: &rpc::forge::Switch,
     ) -> Result<Arc<BmcEndpoint>, HealthError> {
-        let Some(bmc_info) = &switch.bmc_info else {
+        let Some(bmc_endpoint) = &switch.bmc else {
             return Err(HealthError::GenericError(
-                "Could not extract switch endpoint without BMC Info".to_string(),
+                "Could not extract switch endpoint without a BMC endpoint".to_string(),
             ));
         };
-        let addr = BmcAddr::try_from(bmc_info)?;
+        let addr = BmcAddr::try_from(bmc_endpoint)?;
         let metadata = switch_endpoint_metadata(switch, SwitchEndpointRole::Bmc, false)?;
 
         self.endpoint_for(
@@ -962,12 +957,12 @@ impl ApiEndpointSource {
         &self,
         power_shelf: &rpc::forge::PowerShelf,
     ) -> Result<Arc<BmcEndpoint>, HealthError> {
-        let Some(bmc_info) = &power_shelf.bmc_info else {
+        let Some(bmc_endpoint) = &power_shelf.bmc else {
             return Err(HealthError::GenericError(
-                "Could not extract power shelf endpoint without BMC Info".to_string(),
+                "Could not extract power shelf endpoint without a BMC endpoint".to_string(),
             ));
         };
-        let addr = BmcAddr::try_from(bmc_info)?;
+        let addr = BmcAddr::try_from(bmc_endpoint)?;
 
         self.endpoint_for(
             addr,
@@ -1091,18 +1086,6 @@ impl EndpointSource for ApiEndpointSource {
 
     fn fetch_snapshot<'a>(&'a self) -> BoxFuture<'a, Result<EndpointSnapshot, HealthError>> {
         Box::pin(self.fetch_endpoint_snapshot())
-    }
-}
-
-impl TryFrom<&rpc::forge::BmcInfo> for BmcAddr {
-    type Error = HealthError;
-
-    fn try_from(bmc_info: &rpc::forge::BmcInfo) -> Result<Self, Self::Error> {
-        bmc_addr(
-            bmc_info.ip.as_deref(),
-            bmc_info.mac.as_deref(),
-            bmc_info.port,
-        )
     }
 }
 
@@ -1333,7 +1316,7 @@ mod tests {
     }
 
     #[test]
-    fn machine_endpoint_and_inventory_use_structured_bmc() {
+    fn component_endpoints_and_inventory_use_structured_bmc() {
         let source = ApiEndpointSource::new(
             Arc::new(ApiClientWrapper::new(
                 "test-ca.pem".to_string(),
@@ -1358,11 +1341,53 @@ mod tests {
             ..Default::default()
         };
         let endpoint = source.extract_machine_endpoint(&machine).unwrap();
-        assert_eq!(endpoint.addr.ip, "2001:db8::10".parse::<IpAddr>().unwrap());
-        assert_eq!(endpoint.addr.port, Some(8443));
-        assert_eq!(endpoint.addr.mac, Some(test_mac()));
-        let inventory = machine_component_inventory(&machine).unwrap().unwrap();
-        assert_eq!(inventory.bmc_mac, Some(test_mac()));
+        let switch = rpc::forge::Switch {
+            id: Some(test_switch_id()),
+            config: Some(rpc::forge::SwitchConfig {
+                name: "switch-a".to_string(),
+                ..Default::default()
+            }),
+            rack_id: machine.rack_id.clone(),
+            bmc: machine.bmc.clone(),
+            ..Default::default()
+        };
+        let power_shelf = rpc::forge::PowerShelf {
+            id: Some(test_power_shelf_id()),
+            rack_id: machine.rack_id.clone(),
+            bmc: machine.bmc.clone(),
+            ..Default::default()
+        };
+        for (scenario, extracted, inventory) in [
+            (
+                "machine",
+                Ok(endpoint),
+                machine_component_inventory(&machine),
+            ),
+            (
+                "switch",
+                source.extract_switch_endpoint(&switch),
+                switch_component_inventory(&switch),
+            ),
+            (
+                "power shelf",
+                source.extract_power_shelf_endpoint(&power_shelf),
+                power_shelf_component_inventory(&power_shelf),
+            ),
+        ] {
+            let endpoint = extracted.unwrap();
+            assert_eq!(
+                endpoint.addr.ip,
+                "2001:db8::10".parse::<IpAddr>().unwrap(),
+                "{scenario}"
+            );
+            assert_eq!(endpoint.addr.port, Some(8443), "{scenario}");
+            assert_eq!(endpoint.addr.mac, Some(test_mac()), "{scenario}");
+            assert_eq!(
+                inventory.unwrap().unwrap().bmc_mac,
+                Some(test_mac()),
+                "{scenario}"
+            );
+        }
     }
 
     #[test]
@@ -1382,7 +1407,7 @@ mod tests {
         let switch = switch_component_inventory(&rpc::forge::Switch {
             id: Some(test_switch_id()),
             rack_id: Some(rack_id.clone()),
-            bmc_info: None,
+            bmc: None,
             is_primary: true,
             ..Default::default()
         })
@@ -1391,7 +1416,7 @@ mod tests {
         let power_shelf = power_shelf_component_inventory(&rpc::forge::PowerShelf {
             id: Some(test_power_shelf_id()),
             rack_id: Some(rack_id),
-            bmc_info: None,
+            bmc: None,
             ..Default::default()
         })
         .unwrap()
@@ -1588,7 +1613,7 @@ mod tests {
                             name: "power-shelf-a".to_string(),
                             ..Default::default()
                         }),
-                        bmc_info: Some(rpc::forge::BmcInfo {
+                        bmc: Some(rpc::forge::BmcEndpoint {
                             ip: Some("10.0.0.1".to_string()),
                             mac: Some(test_mac().to_string()),
                             port: Some(443),

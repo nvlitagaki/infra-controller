@@ -286,10 +286,10 @@ async fn test_find_switches_by_ids_response_fields(
     // state_version should be populated
     assert!(!switch.state_version.is_empty());
 
-    // bmc_info should be populated from the seeded machine_interface discovery data
+    // bmc should be populated from the seeded machine_interface discovery data
     assert!(
-        switch.bmc_info.is_some(),
-        "bmc_info should be present when discovery data exists"
+        switch.bmc.is_some(),
+        "bmc should be present when discovery data exists"
     );
 
     Ok(())
@@ -322,11 +322,11 @@ async fn test_find_switches_by_ids_includes_resolved_nvos_info(
     let switch = &response.switches[0];
     assert_eq!(switch.id, Some(switch_id));
     assert_eq!(
-        switch.bmc_info.as_ref().and_then(|info| info.mac.clone()),
+        switch.bmc.as_ref().and_then(|info| info.mac.clone()),
         Some(expected.bmc_mac.to_string())
     );
     assert_eq!(
-        switch.bmc_info.as_ref().and_then(|info| info.ip.clone()),
+        switch.bmc.as_ref().and_then(|info| info.ip.clone()),
         Some(expected.bmc_ip.to_string())
     );
 

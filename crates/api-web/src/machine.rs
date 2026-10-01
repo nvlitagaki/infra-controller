@@ -465,7 +465,7 @@ struct MachineDetail<'a> {
     health_detail: super::HealthDetail,
     bmc: Option<rpc::forge::BmcEndpoint>,
     bmc_status: Option<rpc::forge::BmcStatus>,
-    has_complete_bmc_info: bool,
+    has_complete_bmc_endpoint: bool,
     discovery_info_json: String,
     metadata_detail: super::MetadataDetail,
     capabilities: Vec<MachineCapability>,
@@ -968,10 +968,10 @@ impl From<forgerpc::Machine> for MachineDetail<'_> {
             status.health,
             status.health_sources,
         );
-        let has_complete_bmc_info = m
+        let has_complete_bmc_endpoint = m
             .bmc
             .as_ref()
-            .is_some_and(|bmc_info| bmc_info.ip.is_some() && bmc_info.mac.is_some());
+            .is_some_and(|bmc_endpoint| bmc_endpoint.ip.is_some() && bmc_endpoint.mac.is_some());
 
         MachineDetail {
             id: machine_id.clone(),
@@ -993,7 +993,7 @@ impl From<forgerpc::Machine> for MachineDetail<'_> {
             network_config: String::new(), // filled in later
             bmc: m.bmc,
             bmc_status: status.bmc_status,
-            has_complete_bmc_info,
+            has_complete_bmc_endpoint,
             history,
             bios_version,
             board_version,

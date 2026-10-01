@@ -127,9 +127,9 @@ async fn metadata_from_expected_switch(
 ) -> CarbideCliResult<()> {
     let switch = fetch_switch(api_client, cmd.switch).await?;
     let bmc_mac: MacAddress = switch
-        .bmc_info
+        .bmc
         .as_ref()
-        .and_then(|bmc_info| bmc_info.mac.as_ref())
+        .and_then(|bmc| bmc.mac.as_ref())
         .map(|mac| mac.parse())
         .transpose()
         .map_or_else(

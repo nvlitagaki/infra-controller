@@ -2704,6 +2704,9 @@ message PowerShelfStatus {
   repeated HealthSourceOrigin health_sources = 8;
   // Lifecycle related status
   LifecycleStatus lifecycle = 9;
+
+  // Observed BMC versions; omitted when no BMC information is available.
+  BmcStatus bmc_status = 10;
 }
 
 // Describe a PowerShelf configuration and status
@@ -2724,7 +2727,9 @@ message PowerShelf {
   Metadata metadata = 6;
   string version = 7;
 
-  BmcInfo bmc_info = 8;
+  // Deprecated: use bmc for connection details and status.bmc_status for versions.
+  // Retained for compatibility with clients that still read the combined field.
+  BmcInfo bmc_info = 8 [deprecated = true];
 
   // Version string for the current controller state (e.g. "V3-T1774905143273055").
   string state_version = 9;
@@ -2737,6 +2742,9 @@ message PowerShelf {
   // NVLink domain UUID of the shelf's rack, as last reported by the rack's
   // NMX-C endpoint. Unset until a valid domain has been observed.
   common.NVLinkDomainId nvlink_domain_uuid = 13;
+
+  // BMC connection details; omitted when no BMC information is available.
+  BmcEndpoint bmc = 14;
 }
 
 message PowerShelfList {
@@ -2928,6 +2936,9 @@ message SwitchStatus {
   // NVOS management ports, ordered by MAC address. Addresses within each port
   // are ordered by address family, IPv4 before IPv6.
   repeated SwitchNvosPortInfo nvos_ports = 12;
+
+  // Observed BMC versions; omitted when no BMC information is available.
+  BmcStatus bmc_status = 13;
 }
 
 message PlacementInRack {
@@ -2951,7 +2962,9 @@ message Switch {
   // Deprecated: use status.lifecycle instead
   string controller_state = 5;
 
-  BmcInfo bmc_info = 6;
+  // Deprecated: use bmc for connection details and status.bmc_status for versions.
+  // Retained for compatibility with clients that still read the combined field.
+  BmcInfo bmc_info = 6 [deprecated = true];
 
   // Version string for the current controller state (e.g. "V3-T1774905143273055").
   string state_version = 7;
@@ -2971,6 +2984,9 @@ message Switch {
 
   // NVLink domain UUID
   common.NVLinkDomainId nvlink_domain_uuid = 16;
+
+  // BMC connection details; omitted when no BMC information is available.
+  BmcEndpoint bmc = 17;
 }
 
 message SwitchList {
@@ -4563,8 +4579,8 @@ enum MachineType {
   POWER_SHELF = 3;
 }
 
-// BMC connection details and observed versions used by switches, power shelves,
-// and the deprecated Machine.bmc_info compatibility field.
+// BMC connection details and observed versions retained for the deprecated
+// Machine, Switch, and PowerShelf bmc_info compatibility fields.
 message BmcInfo {
   option (carbide.codegen.v1.message_derive) = "serde::Serialize";
   option (carbide.codegen.v1.message_derive) = "serde::Deserialize";
@@ -4576,7 +4592,7 @@ message BmcInfo {
   optional common.MachineInterfaceId machine_interface_id = 6;
 }
 
-// Connection details for a machine's BMC. Unknown values are omitted.
+// Connection details for a BMC. Unknown values are omitted.
 message BmcEndpoint {
   option (carbide.codegen.v1.message_derive) = "serde::Serialize";
   option (carbide.codegen.v1.message_derive) = "serde::Deserialize";

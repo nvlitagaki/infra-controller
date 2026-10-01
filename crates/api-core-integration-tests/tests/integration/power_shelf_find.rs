@@ -225,10 +225,10 @@ async fn test_find_power_shelves_by_ids_response_fields(
     // state_version should be populated
     assert!(!ps.state_version.is_empty());
 
-    // bmc_info is None when no machine_interface discovery data exists
+    // bmc is None when no machine_interface discovery data exists
     assert!(
-        ps.bmc_info.is_none(),
-        "bmc_info should be None when no discovery data exists"
+        ps.bmc.is_none(),
+        "bmc should be None when no discovery data exists"
     );
 
     Ok(())

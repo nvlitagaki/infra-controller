@@ -81,9 +81,9 @@ pub(crate) async fn find_power_shelf(
     Ok(Response::new(rpc::PowerShelfList { power_shelves }))
 }
 
-/// Convert DB power shelves into their RPC representation. `bmc_info` is
-/// populated by the power-shelf load query and carried through the model->rpc
-/// conversion, so no extra resolution is needed here.
+/// Convert DB power shelves into their RPC representation. The load query
+/// resolves the model's BMC information, which the conversion separates into
+/// endpoint and status fields without additional resolution.
 fn convert_power_shelves(
     power_shelf_list: Vec<model::power_shelf::PowerShelf>,
 ) -> Result<Vec<rpc::PowerShelf>, CarbideError> {

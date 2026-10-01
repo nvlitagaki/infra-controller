@@ -395,9 +395,15 @@ fn switch_details_text(switch: &Switch) -> CarbideCliResult<String> {
         writeln!(&mut lines, "\tNone")?;
     }
 
-    // BMC Info
+    // BMC endpoint and observed versions
     writeln!(&mut lines, "\nBMC:")?;
-    if let Some(bmc) = &switch.bmc_info {
+    let bmc_status = switch
+        .status
+        .as_ref()
+        .and_then(|status| status.bmc_status.as_ref());
+    if switch.bmc.is_some() || bmc_status.is_some() {
+        let empty_bmc = rpc::forge::BmcEndpoint::default();
+        let bmc = switch.bmc.as_ref().unwrap_or(&empty_bmc);
         let bmc_data: Vec<(&str, String)> = vec![
             (
                 "Machine Interface ID",
@@ -409,12 +415,14 @@ fn switch_details_text(switch: &Switch) -> CarbideCliResult<String> {
             ("MAC", bmc.mac.clone().unwrap_or_else(|| "N/A".to_string())),
             (
                 "Version",
-                bmc.version.clone().unwrap_or_else(|| "N/A".to_string()),
+                bmc_status
+                    .and_then(|status| status.version.clone())
+                    .unwrap_or_else(|| "N/A".to_string()),
             ),
             (
                 "Firmware Version",
-                bmc.firmware_version
-                    .clone()
+                bmc_status
+                    .and_then(|status| status.firmware_version.clone())
                     .unwrap_or_else(|| "N/A".to_string()),
             ),
             (
@@ -460,7 +468,9 @@ mod tests {
 
     use carbide_uuid::rack::RackId;
     use carbide_uuid::switch::SwitchId;
-    use rpc::forge::{BmcInfo, Metadata, PlacementInRack, Switch, SwitchConfig, SwitchStatus};
+    use rpc::forge::{
+        BmcEndpoint, BmcStatus, Metadata, PlacementInRack, Switch, SwitchConfig, SwitchStatus,
+    };
 
     use super::*;
 
@@ -489,6 +499,10 @@ mod tests {
                 health_status: Some("ok".to_string()),
                 controller_state: Some("ready".to_string()),
                 fabric_manager_status: Some("not_running".to_string()),
+                bmc_status: Some(BmcStatus {
+                    version: Some("V1-T1778792629596284".to_string()),
+                    firmware_version: Some("1.3.5-GA".to_string()),
+                }),
                 ..Default::default()
             }),
             placement_in_rack: Some(PlacementInRack {
@@ -503,11 +517,9 @@ mod tests {
                 name: "sw100nsner0op5osl6n85t7772j010jmhafm934n7oej4mlome3okrn9b60".to_string(),
                 ..Default::default()
             }),
-            bmc_info: Some(BmcInfo {
+            bmc: Some(BmcEndpoint {
                 ip: Some("10.85.14.106".to_string()),
                 mac: Some("E0:9D:73:F0:45:96".to_string()),
-                version: Some("V1-T1778792629596284".to_string()),
-                firmware_version: Some("1.3.5-GA".to_string()),
                 machine_interface_id: None,
                 port: Some(443),
             }),
