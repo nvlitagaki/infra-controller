@@ -174,7 +174,7 @@ fn get_bmc_info<'a>(
     }
 
     for machine in machines {
-        let Some(bmc_ip) = machine.bmc_info.as_ref().and_then(|x| x.ip.as_deref()) else {
+        let Some(bmc_ip) = machine.bmc.as_ref().and_then(|x| x.ip.as_deref()) else {
             continue;
         };
 
@@ -376,7 +376,7 @@ fn create_inventory_for_instances<'a>(
         used_machines.push(machine.id);
 
         let bmc_ip = machine
-            .bmc_info
+            .bmc
             .as_ref()
             .and_then(|x| x.ip.as_deref())
             .unwrap_or_default();

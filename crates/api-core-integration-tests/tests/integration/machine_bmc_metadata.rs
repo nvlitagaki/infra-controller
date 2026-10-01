@@ -77,7 +77,7 @@ async fn fetch_bmc_credentials(pool: PgPool) {
     let (env, mh) = init(pool).await;
     let host_bmc_mac = mh.host.bmc_mac;
     let host_machine = mh.host.rpc_machine().await;
-    let bmc_info = host_machine.bmc_info.clone().unwrap();
+    let bmc_info = host_machine.bmc.clone().unwrap();
     assert_eq!(bmc_info.mac, Some(host_bmc_mac.to_string()));
     let host_bmc_ip = bmc_info.ip.clone().expect("Host BMC IP must be available");
 
@@ -128,7 +128,7 @@ async fn test_fetch_ssh_serial_console_metadata(pool: PgPool) {
     let (env, mh) = init(pool).await;
     let host_machine = mh.host.rpc_machine().await;
     let host_bmc_ip = host_machine
-        .bmc_info
+        .bmc
         .as_ref()
         .and_then(|bmc_info| bmc_info.ip.clone())
         .expect("Host BMC IP must be available");
@@ -166,7 +166,7 @@ async fn test_fetch_ssh_serial_console_metadata_ignores_invalid_ports(pool: PgPo
     let (env, mh) = init(pool).await;
     let host_machine = mh.host.rpc_machine().await;
     let host_bmc_ip = host_machine
-        .bmc_info
+        .bmc
         .as_ref()
         .and_then(|bmc_info| bmc_info.ip.clone())
         .expect("Host BMC IP must be available");
@@ -210,7 +210,7 @@ async fn test_fetch_ipmi_metadata(pool: PgPool) {
     let (env, mh) = init(pool).await;
     let host_bmc_mac = mh.host.bmc_mac;
     let host_machine = mh.host.rpc_machine().await;
-    let bmc_info = host_machine.bmc_info.clone().unwrap();
+    let bmc_info = host_machine.bmc.clone().unwrap();
     assert_eq!(bmc_info.mac, Some(host_bmc_mac.to_string()));
     let host_bmc_ip = bmc_info.ip.clone().expect("Host BMC IP must be available");
 
@@ -251,7 +251,7 @@ async fn test_fetch_ipmi_metadata_ignores_invalid_ports(pool: PgPool) {
     let (env, mh) = init(pool).await;
     let host_machine = mh.host.rpc_machine().await;
     let host_bmc_ip = host_machine
-        .bmc_info
+        .bmc
         .as_ref()
         .and_then(|bmc_info| bmc_info.ip.clone())
         .expect("Host BMC IP must be available");
@@ -293,7 +293,7 @@ async fn test_fetch_ipmi_metadata_null_vendor(pool: PgPool) {
     let (env, mh) = init(pool).await;
     let host_bmc_mac = mh.host.bmc_mac;
     let host_machine = mh.host.rpc_machine().await;
-    let bmc_info = host_machine.bmc_info.clone().unwrap();
+    let bmc_info = host_machine.bmc.clone().unwrap();
     assert_eq!(bmc_info.mac, Some(host_bmc_mac.to_string()));
     let host_bmc_ip = bmc_info.ip.clone().expect("Host BMC IP must be available");
 

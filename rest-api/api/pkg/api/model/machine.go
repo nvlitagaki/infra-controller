@@ -660,9 +660,9 @@ func (m *APIMachineMetadata) FromProto(machine *corev1.Machine) {
 		return
 	}
 
-	if machine.BmcInfo != nil {
+	if machine.BmcInfo != nil { //nolint:staticcheck // Older Core versions expose BMC data only through this field.
 		m.BMCInfo = &APIBMCInfo{}
-		m.BMCInfo.FromProto(machine.BmcInfo)
+		m.BMCInfo.FromProto(machine.BmcInfo) //nolint:staticcheck // Preserve compatibility with Core versions before the BMC split.
 	}
 
 	discoveryInfo := machine.GetStatus().GetDiscoveryInfo()

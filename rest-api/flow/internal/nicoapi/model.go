@@ -127,6 +127,8 @@ func machineDetailFromPb(machine *corev1.Machine) MachineDetail {
 	}
 
 	// BMC info
+	// Older Core versions expose BMC data only through this field.
+	//nolint:staticcheck
 	if machine.BmcInfo != nil {
 		if machine.BmcInfo.Ip != nil {
 			detail.BmcIP = *machine.BmcInfo.Ip

@@ -593,7 +593,7 @@ async fn get_bmc_ip_from_host_id(
     let machine = api_client.get_machine(machine_id).await?;
 
     // Extract BMC info
-    let bmc_info = machine.bmc_info.ok_or_else(|| {
+    let bmc_info = machine.bmc.ok_or_else(|| {
         CarbideCliError::GenericError(format!(
             "Machine {} does not have BMC info available",
             host_id
