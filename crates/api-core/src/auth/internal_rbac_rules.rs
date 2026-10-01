@@ -962,6 +962,7 @@ impl InternalRBACRules {
         x.perm("GetRackProfile", vec![ForgeAdminCLI]);
         x.perm("ListRackProfiles", vec![ForgeAdminCLI]);
         x.perm("RackManagerCall", vec![ForgeAdminCLI]);
+        x.perm("GetRmsVersion", vec![ForgeAdminCLI]);
         x.perm("ScoutStream", vec![Scout]);
         x.perm("ScoutStreamShowConnections", vec![ForgeAdminCLI]);
         x.perm("ScoutStreamDisconnect", vec![ForgeAdminCLI]);
@@ -975,6 +976,7 @@ impl InternalRBACRules {
         x.perm("MlxAdminLockdownStatus", vec![ForgeAdminCLI]);
         x.perm("MlxAdminShowDevice", vec![ForgeAdminCLI]);
         x.perm("MlxAdminShowMachine", vec![ForgeAdminCLI]);
+        x.perm("MlxAdminShowDeviceIdentities", vec![ForgeAdminCLI]);
         x.perm("MlxAdminRegistryList", vec![ForgeAdminCLI]);
         x.perm("MlxAdminRegistryShow", vec![ForgeAdminCLI]);
         x.perm("MlxAdminConfigQuery", vec![ForgeAdminCLI]);
