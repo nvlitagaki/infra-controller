@@ -4556,6 +4556,36 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ExpectedMachine'
+              examples:
+                replaced-inventory:
+                  summary: Persisted replacement inventory
+                  description: Response to the nonempty replacement request; credentials are not returned and undiscovered hardware fields
+                    remain null.
+                  value:
+                    - id: 497f6eca-6276-4993-bfeb-53cbbbba6f08
+                      siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                      bmcMacAddress: 00:1A:2B:3C:4D:5E
+                      chassisSerialNumber: CHASSIS-12345
+                      bmcIpAddress: null
+                      rackId: null
+                      name: null
+                      manufacturer: null
+                      model: null
+                      description: null
+                      slotId: null
+                      trayIdx: null
+                      hostId: null
+                      fallbackDPUSerialNumbers: []
+                      skuId: null
+                      machineId: null
+                      isDpfEnabled: true
+                      labels:
+                        rack: A1
+                      created: '2026-09-30T12:00:00Z'
+                      updated: '2026-09-30T12:00:00Z'
+                cleared-inventory:
+                  summary: Response after explicitly replacing with an empty array
+                  value: []
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -4677,6 +4707,7 @@ paths:
         in: path
         required: true
         description: Label key. It must not be empty, consist only of whitespace, or contain the Unicode NUL character (U+0000). Reserved path characters, including `/`, must be percent-encoded.
+        example: failure-domain
     get:
       summary: Retrieve Expected Machine label values
       operationId: get-all-expected-machine-label-values
@@ -5150,6 +5181,32 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ExpectedPowerShelf'
+              examples:
+                replaced-inventory:
+                  summary: Persisted replacement inventory
+                  description: Response to the nonempty replacement request; credentials are not returned and undiscovered hardware fields
+                    remain null.
+                  value:
+                    - id: 497f6eca-6276-4993-bfeb-53cbbbba6f08
+                      siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                      bmcMacAddress: 00:1A:2B:3C:4D:70
+                      shelfSerialNumber: SHELF-12345
+                      bmcIpAddress: null
+                      rackId: null
+                      name: null
+                      manufacturer: null
+                      model: null
+                      description: null
+                      slotId: null
+                      trayIdx: null
+                      hostId: null
+                      labels:
+                        rack: A1
+                      created: '2026-09-30T12:00:00Z'
+                      updated: '2026-09-30T12:00:00Z'
+                cleared-inventory:
+                  summary: Response after explicitly replacing with an empty array
+                  value: []
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -5339,6 +5396,8 @@ paths:
                     location.datacenter: phx-dc01
                     location.room: room-1
                     location.position: A1
+                description: Assumes nvl5-gp1-jhb01 already contains rack-01 with NVIDIA compute, switch, and power-shelf members. Core
+                  derives rackProfileId and rackGroupId; neither field is a creation input.
         description: Expected Rack creation request
         required: true
       responses:
@@ -5523,6 +5582,43 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ExpectedRack'
+              examples:
+                replaced-inventory:
+                  summary: Persisted replacement inventory
+                  value:
+                    - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                      rackId: rack-01
+                      name: Rack 01
+                      description: Production rack in row A
+                      labels:
+                        chassis.manufacturer: NVIDIA
+                        chassis.serial-number: NVRK0001001
+                        chassis.model: GB200-NVL72
+                        location.datacenter: phx-dc01
+                        location.position: A1
+                      id: 497f6eca-6276-4993-bfeb-53cbbbba6f08
+                      created: '2026-09-30T12:00:00Z'
+                      updated: '2026-09-30T12:00:00Z'
+                      rackProfileId: GB200_NVL72R1_C2G4_NVIDIA
+                      rackGroupId: nvl5-gp1-jhb01
+                    - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                      rackId: rack-02
+                      name: Rack 02
+                      description: Production rack in row A
+                      labels:
+                        chassis.manufacturer: NVIDIA
+                        chassis.serial-number: NVRK0001002
+                        chassis.model: GB200-NVL72
+                        location.datacenter: phx-dc01
+                        location.position: A2
+                      id: f17fb98d-f9f8-4c84-aabb-c9530ea40cde
+                      created: '2026-09-30T12:00:00Z'
+                      updated: '2026-09-30T12:00:00Z'
+                      rackProfileId: GB200_NVL72R1_C2G4_NVIDIA
+                      rackGroupId: nvl5-gp1-jhb01
+                cleared-inventory:
+                  summary: Response after explicitly replacing with an empty array
+                  value: []
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -5707,7 +5803,29 @@ paths:
                   siteId: f97df110-f4de-492e-8849-4a6af68026b0
                   rackGroupId: nvl5-gp1-jhb01
                   topology: gb200_nvl72r1_c2g4
-                  racks: [{rackId: rack-01, members: [{type: NVSwitch, manufacturer: NVIDIA, id: switch-01}]}, {rackId: rack-02, members: []}]
+                  racks:
+                    - rackId: rack-01
+                      members:
+                        - type: Compute
+                          manufacturer: NVIDIA
+                          id: compute-01
+                        - type: NVSwitch
+                          manufacturer: NVIDIA
+                          id: switch-01
+                        - type: PowerShelf
+                          manufacturer: NVIDIA
+                          id: powershelf-01
+                    - rackId: rack-02
+                      members:
+                        - type: Compute
+                          manufacturer: NVIDIA
+                          id: compute-02
+                        - type: NVSwitch
+                          manufacturer: NVIDIA
+                          id: switch-02
+                        - type: PowerShelf
+                          manufacturer: NVIDIA
+                          id: powershelf-02
                   name: NVL rack group 1
                   description: Production NVL rack group in row A
                   labels:
@@ -5718,6 +5836,8 @@ paths:
                     location.datacenter: phx-dc01
                     location.room: room-1
                     location.position: A1
+                description: Representative members for profile derivation. Declare each rack in exactly one group, supply its actual
+                  device inventory, and configure GB200_NVL72R1_C2G4_NVIDIA in Core before creating the Expected Rack.
         description: Expected Rack Group creation request
         required: true
       responses:
@@ -5840,7 +5960,29 @@ paths:
                     - siteId: f97df110-f4de-492e-8849-4a6af68026b0
                       rackGroupId: nvl5-gp1-jhb01
                       topology: gb200_nvl72r1_c2g4
-                      racks: [{rackId: rack-01, members: []}, {rackId: rack-02, members: []}]
+                      racks:
+                        - rackId: rack-01
+                          members:
+                            - type: Compute
+                              manufacturer: NVIDIA
+                              id: compute-01
+                            - type: NVSwitch
+                              manufacturer: NVIDIA
+                              id: switch-01
+                            - type: PowerShelf
+                              manufacturer: NVIDIA
+                              id: powershelf-01
+                        - rackId: rack-02
+                          members:
+                            - type: Compute
+                              manufacturer: NVIDIA
+                              id: compute-02
+                            - type: NVSwitch
+                              manufacturer: NVIDIA
+                              id: switch-02
+                            - type: PowerShelf
+                              manufacturer: NVIDIA
+                              id: powershelf-02
                       name: NVL rack group 1
                       description: Production NVL rack group in row A
                       labels:
@@ -5852,7 +5994,29 @@ paths:
                     - siteId: f97df110-f4de-492e-8849-4a6af68026b0
                       rackGroupId: nvl5-gp2-jhb01
                       topology: gb200_nvl72r1_c2g4
-                      racks: [{rackId: rack-03, members: []}, {rackId: rack-04, members: []}]
+                      racks:
+                        - rackId: rack-03
+                          members:
+                            - type: Compute
+                              manufacturer: NVIDIA
+                              id: compute-03
+                            - type: NVSwitch
+                              manufacturer: NVIDIA
+                              id: switch-03
+                            - type: PowerShelf
+                              manufacturer: NVIDIA
+                              id: powershelf-03
+                        - rackId: rack-04
+                          members:
+                            - type: Compute
+                              manufacturer: NVIDIA
+                              id: compute-04
+                            - type: NVSwitch
+                              manufacturer: NVIDIA
+                              id: switch-04
+                            - type: PowerShelf
+                              manufacturer: NVIDIA
+                              id: powershelf-04
                       name: NVL rack group 2
                       description: Production NVL rack group in row A
                       labels:
@@ -5913,6 +6077,89 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ExpectedRackGroup'
+              examples:
+                replaced-inventory:
+                  summary: Persisted replacement inventory
+                  value:
+                    - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                      rackGroupId: nvl5-gp1-jhb01
+                      topology: gb200_nvl72r1_c2g4
+                      racks:
+                        - rackId: rack-01
+                          members:
+                            - type: Compute
+                              manufacturer: NVIDIA
+                              id: compute-01
+                            - type: NVSwitch
+                              manufacturer: NVIDIA
+                              id: switch-01
+                            - type: PowerShelf
+                              manufacturer: NVIDIA
+                              id: powershelf-01
+                        - rackId: rack-02
+                          members:
+                            - type: Compute
+                              manufacturer: NVIDIA
+                              id: compute-02
+                            - type: NVSwitch
+                              manufacturer: NVIDIA
+                              id: switch-02
+                            - type: PowerShelf
+                              manufacturer: NVIDIA
+                              id: powershelf-02
+                      name: NVL rack group 1
+                      description: Production NVL rack group in row A
+                      labels:
+                        chassis.manufacturer: NVIDIA
+                        chassis.serial-number: NVRK0001001
+                        chassis.model: GB200-NVL72
+                        location.datacenter: phx-dc01
+                        location.position: A1
+                      id: 497f6eca-6276-4993-bfeb-53cbbbba6f08
+                      created: '2026-09-30T12:00:00Z'
+                      updated: '2026-09-30T12:00:00Z'
+                      site: null
+                    - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                      rackGroupId: nvl5-gp2-jhb01
+                      topology: gb200_nvl72r1_c2g4
+                      racks:
+                        - rackId: rack-03
+                          members:
+                            - type: Compute
+                              manufacturer: NVIDIA
+                              id: compute-03
+                            - type: NVSwitch
+                              manufacturer: NVIDIA
+                              id: switch-03
+                            - type: PowerShelf
+                              manufacturer: NVIDIA
+                              id: powershelf-03
+                        - rackId: rack-04
+                          members:
+                            - type: Compute
+                              manufacturer: NVIDIA
+                              id: compute-04
+                            - type: NVSwitch
+                              manufacturer: NVIDIA
+                              id: switch-04
+                            - type: PowerShelf
+                              manufacturer: NVIDIA
+                              id: powershelf-04
+                      name: NVL rack group 2
+                      description: Production NVL rack group in row A
+                      labels:
+                        chassis.manufacturer: NVIDIA
+                        chassis.serial-number: NVRK0001002
+                        chassis.model: GB200-NVL72
+                        location.datacenter: phx-dc01
+                        location.position: A2
+                      id: f17fb98d-f9f8-4c84-aabb-c9530ea40cde
+                      created: '2026-09-30T12:00:00Z'
+                      updated: '2026-09-30T12:00:00Z'
+                      site: null
+                cleared-inventory:
+                  summary: Response after explicitly replacing with an empty array
+                  value: []
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -6016,7 +6263,40 @@ paths:
               example-1:
                 value:
                   topology: gb300_nvl72r1_c2g4
-                  racks: [{rackId: rack-01, members: []}, {rackId: rack-02, members: []}, {rackId: rack-03, members: []}]
+                  racks:
+                    - rackId: rack-01
+                      members:
+                        - type: Compute
+                          manufacturer: NVIDIA
+                          id: compute-01
+                        - type: NVSwitch
+                          manufacturer: NVIDIA
+                          id: switch-01
+                        - type: PowerShelf
+                          manufacturer: NVIDIA
+                          id: powershelf-01
+                    - rackId: rack-02
+                      members:
+                        - type: Compute
+                          manufacturer: NVIDIA
+                          id: compute-02
+                        - type: NVSwitch
+                          manufacturer: NVIDIA
+                          id: switch-02
+                        - type: PowerShelf
+                          manufacturer: NVIDIA
+                          id: powershelf-02
+                    - rackId: rack-03
+                      members:
+                        - type: Compute
+                          manufacturer: NVIDIA
+                          id: compute-03
+                        - type: NVSwitch
+                          manufacturer: NVIDIA
+                          id: switch-03
+                        - type: PowerShelf
+                          manufacturer: NVIDIA
+                          id: powershelf-03
                   name: NVL rack group 1 (updated)
                   description: Production NVL rack group in row A, expanded membership
                   labels:
@@ -6229,6 +6509,34 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ExpectedSwitch'
+              examples:
+                replaced-inventory:
+                  summary: Persisted replacement inventory
+                  description: Response to the nonempty replacement request; credentials are not returned and undiscovered hardware fields
+                    remain null.
+                  value:
+                    - id: 497f6eca-6276-4993-bfeb-53cbbbba6f08
+                      siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                      bmcMacAddress: 00:1A:2B:3C:4D:60
+                      switchSerialNumber: SWITCH-12345
+                      nvosMacAddresses:
+                        - 00:1A:2B:3C:4D:61
+                      bmcIpAddress: null
+                      rackId: null
+                      name: null
+                      manufacturer: null
+                      model: null
+                      description: null
+                      slotId: null
+                      trayIdx: null
+                      hostId: null
+                      labels:
+                        rack: A1
+                      created: '2026-09-30T12:00:00Z'
+                      updated: '2026-09-30T12:00:00Z'
+                cleared-inventory:
+                  summary: Response after explicitly replacing with an empty array
+                  value: []
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -10958,6 +11266,7 @@ paths:
         in: path
         required: true
         description: Label key. It must not be empty, consist only of whitespace, or contain the Unicode NUL character (U+0000). Reserved path characters, including `/`, must be percent-encoded.
+        example: failure-domain
     get:
       summary: Retrieve Machine label values
       operationId: get-all-machine-label-values
@@ -11844,6 +12153,7 @@ paths:
         in: path
         required: true
         description: Health report source
+        example: overrides.sre
     delete:
       summary: Delete Machine health report
       tags:
@@ -12740,6 +13050,19 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/NVLinkDomain'
+              examples:
+                rack-group-domain:
+                  summary: Rack group after discovery and inventory sync
+                  description: Default includeComponents=false projection. The rack-group ID is distinct from the observed NMX-C cluster
+                    UUID.
+                  value:
+                    - id: nvl5-gp1-jhb01
+                      rackGroupId: nvl5-gp1-jhb01
+                      nmxcClusterId: 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
+                      name: ''
+                      topology: GB200_NVL72R1_C2G4
+                      operationStatus: Ready
+                      components: null
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -12765,6 +13088,7 @@ paths:
           type: string
           minLength: 1
           pattern: '\S'
+        example: nvl5-gp1-jhb01
     get:
       summary: Retrieve an NVLink Domain
       operationId: get-nvlink-domain
@@ -12793,6 +13117,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NVLinkDomain'
+              examples:
+                rack-group-domain:
+                  summary: Rack group after discovery and inventory sync
+                  value:
+                    id: nvl5-gp1-jhb01
+                    rackGroupId: nvl5-gp1-jhb01
+                    nmxcClusterId: 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
+                    name: ''
+                    topology: GB200_NVL72R1_C2G4
+                    operationStatus: Ready
+                    components: null
+                cluster-not-observed:
+                  summary: No NMX-C cluster observation yet
+                  value:
+                    id: nvl5-gp1-jhb01
+                    rackGroupId: nvl5-gp1-jhb01
+                    nmxcClusterId: null
+                    name: ''
+                    topology: GB200_NVL72R1_C2G4
+                    operationStatus: Ready
+                    components: null
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -12833,9 +13178,17 @@ paths:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
                   domainIds:
-                    - 650e8400-e29b-41d4-a716-446655440001
-                    - 750e8400-e29b-41d4-a716-446655440002
+                    - nvl5-gp1-jhb01
+                    - nvl5-gp2-jhb01
                   state: 'Off'
+              ac-power-cycle:
+                summary: Remove and restore AC power
+                description: Unsupported on Viking systems.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  state: ACPowerCycle
+                  domainIds:
+                    - nvl5-gp1-jhb01
       responses:
         '200':
           description: OK
@@ -12942,7 +13295,7 @@ paths:
                       description: Primary compute rack
                       operationStatus: Ready
                       nvLinkDomainIds:
-                        - 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
+                        - nvl5-gp1-jhb01
                       taskStats:
                         pendingTaskCount: 0
                         activeTaskCount: 0
@@ -12964,12 +13317,16 @@ paths:
                           hostId: 0
                           bmcs:
                             - type: BmcTypeHost
-                              macAddress: 'AA:BB:CC:DD:EE:01'
+                              macAddress: AA:BB:CC:DD:EE:01
                               ipAddress: 10.0.0.101
                           powerState: 'on'
                           leakStatus: Leaking
                           leakHandlingStatus: ShuttingDown
                           health: null
+                          rackId: rack-01
+                          model: GB200
+                          description: ''
+                          operationStatus: Ready
           headers:
             X-Pagination:
               schema:
@@ -12996,6 +13353,7 @@ paths:
         in: path
         required: true
         description: ID of the Rack
+        example: rack-01
     get:
       summary: Retrieve a Rack
       operationId: get-rack
@@ -13034,7 +13392,7 @@ paths:
                     description: Primary compute rack
                     operationStatus: Ready
                     nvLinkDomainIds:
-                      - 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
+                      - nvl5-gp1-jhb01
                     taskStats:
                       pendingTaskCount: 0
                       activeTaskCount: 0
@@ -13056,12 +13414,16 @@ paths:
                         hostId: 0
                         bmcs:
                           - type: BmcTypeHost
-                            macAddress: 'AA:BB:CC:DD:EE:01'
+                            macAddress: AA:BB:CC:DD:EE:01
                             ipAddress: 10.0.0.101
                         powerState: 'on'
                         leakStatus: NoLeak
                         leakHandlingStatus: None
                         health: null
+                        rackId: rack-01
+                        model: GB200
+                        description: ''
+                        operationStatus: Ready
         '403':
           $ref: '#/components/responses/ForbiddenError'
         '404':
@@ -13130,7 +13492,7 @@ paths:
                     diffs:
                       - type: Missing
                         id: null
-                        macAddress: 'AA:BB:CC:DD:EE:01'
+                        macAddress: AA:BB:CC:DD:EE:01
                         expected:
                           type: Compute
                           name: Server-01
@@ -13142,17 +13504,24 @@ paths:
                           hostId: 0
                           bmcs:
                             - type: BmcTypeHost
-                              macAddress: 'AA:BB:CC:DD:EE:01'
+                              macAddress: AA:BB:CC:DD:EE:01
                               ipAddress: 10.0.0.101
                           powerState: 'on'
                           health: null
+                          id: ''
+                          rackId: rack-01
+                          model: GB200
+                          description: ''
+                          operationStatus: Unknown
+                          leakStatus: Unknown
+                          leakHandlingStatus: Unknown
                       - type: Mismatch
                         id: comp-2
                         macAddress: null
                         fieldDiffs:
                           - fieldName: firmware_version
-                            expectedValue: '1.0.0'
-                            actualValue: '2.0.0'
+                            expectedValue: 1.0.0
+                            actualValue: 2.0.0
                     totalDiffs: 2
                     missingCount: 1
                     unexpectedCount: 0
@@ -13180,6 +13549,7 @@ paths:
         in: path
         required: true
         description: ID of the Rack
+        example: rack-01
     get:
       summary: Retrieve all Rack health reports
       operationId: get-all-rack-health-report
@@ -13262,12 +13632,14 @@ paths:
         in: path
         required: true
         description: ID of the Rack
+        example: rack-01
       - schema:
           type: string
         name: source
         in: path
         required: true
         description: Health report source
+        example: overrides.sre
     delete:
       summary: Delete Rack health report
       operationId: delete-rack-health-report
@@ -13312,6 +13684,7 @@ paths:
         in: path
         required: true
         description: ID of the Rack
+        example: rack-01
     get:
       summary: Validate a Rack
       operationId: validate-rack
@@ -13350,7 +13723,7 @@ paths:
                     diffs:
                       - type: Missing
                         id: null
-                        macAddress: 'AA:BB:CC:DD:EE:01'
+                        macAddress: AA:BB:CC:DD:EE:01
                         expected:
                           type: Compute
                           name: Server-01
@@ -13362,17 +13735,24 @@ paths:
                           hostId: 0
                           bmcs:
                             - type: BmcTypeHost
-                              macAddress: 'AA:BB:CC:DD:EE:01'
+                              macAddress: AA:BB:CC:DD:EE:01
                               ipAddress: 10.0.0.101
                           powerState: 'on'
                           health: null
+                          id: ''
+                          rackId: rack-01
+                          model: GB200
+                          description: ''
+                          operationStatus: Unknown
+                          leakStatus: Unknown
+                          leakHandlingStatus: Unknown
                       - type: Mismatch
                         id: comp-2
                         macAddress: null
                         fieldDiffs:
                           - fieldName: firmware_version
-                            expectedValue: '1.0.0'
-                            actualValue: '2.0.0'
+                            expectedValue: 1.0.0
+                            actualValue: 2.0.0
                     totalDiffs: 2
                     missingCount: 1
                     unexpectedCount: 0
@@ -13423,6 +13803,15 @@ paths:
                       - Rack-001
                       - Rack-002
                   state: 'On'
+              ac-power-cycle:
+                summary: Remove and restore AC power
+                description: Unsupported on Viking systems.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  state: ACPowerCycle
+                  filter:
+                    names:
+                      - Rack-01
       responses:
         '200':
           description: OK
@@ -13458,6 +13847,7 @@ paths:
         in: path
         required: true
         description: ID of the Rack
+        example: rack-01
     patch:
       summary: Power control a Rack
       operationId: power-control-rack
@@ -13542,7 +13932,44 @@ paths:
                   filter:
                     names:
                       - Rack-001
-                  version: '24.11.0'
+                  version: 24.11.0
+              reapply-version:
+                summary: Reapply a configured firmware version
+                description: Assumes this version is available to the selected backend. Readiness checks remain enabled; the backend must
+                  support the version override.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  overrideVersionCheck: true
+                  filter:
+                    names:
+                      - Rack-01
+              authenticated-download:
+                summary: Shared firmware download credential
+                description: Replace the illustrative credential with the value expected by the configured firmware backend.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  authenticationData:
+                    shared: REPLACE_WITH_FIRMWARE_DOWNLOAD_TOKEN
+                  filter:
+                    names:
+                      - Rack-01
+              per-component-download:
+                summary: Firmware and credentials per component type
+                description: Version is a serialized JSON string; authenticationData is an object using the exact lowercase component
+                  keys. Replace the illustrative versions and credentials with configured backend values.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  filter:
+                    names:
+                      - Rack-01
+                  version: '{"compute":"24.11.0","nvswitch":"24.11.0","powershelf":"24.11.0"}'
+                  authenticationData:
+                    perComponent:
+                      compute: REPLACE_WITH_COMPUTE_DOWNLOAD_TOKEN
+                      nvswitch: REPLACE_WITH_SWITCH_DOWNLOAD_TOKEN
+                      powershelf: REPLACE_WITH_POWERSHELF_DOWNLOAD_TOKEN
       responses:
         '200':
           description: OK
@@ -13578,6 +14005,7 @@ paths:
         in: path
         required: true
         description: ID of the Rack
+        example: rack-01
     patch:
       summary: Firmware update a Rack
       operationId: firmware-update-rack
@@ -13595,10 +14023,26 @@ paths:
               with-version:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
-                  version: '24.11.0'
+                  version: 24.11.0
               without-version:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
+              reapply-version:
+                summary: Reapply a configured firmware version
+                description: Assumes this version is available to the selected backend. Readiness checks remain enabled; the backend must
+                  support the version override.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  overrideVersionCheck: true
+              authenticated-download:
+                summary: Shared firmware download credential
+                description: Replace the illustrative credential with the value expected by the configured firmware backend.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  authenticationData:
+                    shared: REPLACE_WITH_FIRMWARE_DOWNLOAD_TOKEN
       responses:
         '200':
           description: OK
@@ -13686,6 +14130,7 @@ paths:
         in: path
         required: true
         description: ID of the Rack
+        example: rack-01
     post:
       summary: Bring up a Rack
       operationId: bringup-rack
@@ -13844,11 +14289,12 @@ paths:
                         trayIdx: 0
                         hostId: 1
                       rackId: rack-01
-                      nvLinkDomainId: 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
+                      nvLinkDomainId: nvl5-gp1-jhb01
                       taskStats:
                         pendingTaskCount: 0
                         activeTaskCount: 0
                       health: null
+                      operationStatus: Ready
           headers:
             X-Pagination:
               schema:
@@ -13970,6 +14416,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OperationRule'
+              examples:
+                created-rule:
+                  summary: Created rule (selected response fields)
+                  description: Create echoes the ID and submitted rule, leaving timestamps at Go zero values. GET returns persisted timestamps.
+                    Unspecified optional action fields are omitted from this excerpt.
+                  value:
+                    name: Power on - shelves, then switches, then compute
+                    description: Verifies each component type reached the on state before the next stage starts.
+                    operationType: PowerControl
+                    operationCode: power_on
+                    ruleDefinition:
+                      version: v1
+                      steps:
+                        - componentType: PowerShelf
+                          stage: 1
+                          maxParallel: 0
+                          timeout: 15m
+                          retry:
+                            maxAttempts: 3
+                            initialInterval: 5s
+                            backoffCoefficient: 2
+                            maxInterval: 1m
+                          mainOperation:
+                            name: PowerControl
+                          postOperation:
+                            - name: VerifyPowerStatus
+                              timeout: 5m
+                              pollInterval: 10s
+                              parameters:
+                                expected_status: 'on'
+                        - componentType: NVSwitch
+                          stage: 2
+                          maxParallel: 0
+                          timeout: 15m
+                          retry:
+                            maxAttempts: 3
+                            initialInterval: 5s
+                            backoffCoefficient: 2
+                          mainOperation:
+                            name: PowerControl
+                          postOperation:
+                            - name: VerifyPowerStatus
+                              timeout: 5m
+                              pollInterval: 10s
+                              parameters:
+                                expected_status: 'on'
+                        - componentType: Compute
+                          stage: 3
+                          maxParallel: 8
+                          timeout: 20m
+                          retry:
+                            maxAttempts: 3
+                            initialInterval: 1s
+                            backoffCoefficient: 2
+                          mainOperation:
+                            name: PowerControl
+                          postOperation:
+                            - name: VerifyReachability
+                              timeout: 10m
+                              pollInterval: 30s
+                              parameters:
+                                component_types:
+                                  - Compute
+                                require_all: true
+                    id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                    isDefault: false
+                    created: '0001-01-01T00:00:00Z'
+                    updated: '0001-01-01T00:00:00Z'
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -14251,6 +14765,11 @@ paths:
                     status: Terminated
                     description: Power on rack components
                     message: Cancelled by user
+                    ruleId: null
+                    started: '2026-09-30T11:59:30Z'
+                    finished: '2026-09-30T12:00:00Z'
+                    created: '2026-09-30T11:59:00Z'
+                    updated: '2026-09-30T12:00:00Z'
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -14503,10 +15022,11 @@ paths:
             examples:
               gated-firmware-rollout:
                 summary: Gated firmware rollout over a 10% cohort
-                description: |-
-                  Takes a deterministic 10% of the Site's candidate Racks, splits
+                description: 'Takes a deterministic 10% of the Site''s candidate Racks, splits
+
                   the cohort into two equal phases, and holds at a phase gate
-                  between them because `autoAdvance` is false.
+
+                  between them because `autoAdvance` is false.'
                 value:
                   siteId: 60189e9c-7d12-438c-b9ca-6998d9c364b1
                   name: Compute firmware 25.03 - 10% cohort
@@ -14545,10 +15065,11 @@ paths:
                         - bios
               fleet-rollout:
                 summary: Fleet-wide rollout excluding an earlier cohort
-                description: |-
-                  Omitting `selector` targets the full candidate scope;
+                description: 'Omitting `selector` targets the full candidate scope;
+
                   `excludeRunIds` keeps the Racks an earlier Task Run already
-                  covered out of this one.
+
+                  covered out of this one.'
                 value:
                   siteId: 60189e9c-7d12-438c-b9ca-6998d9c364b1
                   name: Compute firmware 25.03 - fleet
@@ -14572,6 +15093,46 @@ paths:
                       ruleId: 8f2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
                     excludeRunIds:
                       - 3b1f0c62-9a5d-4c8e-9f10-7d2e5a6b8c41
+              reapply-version:
+                summary: Reapply firmware using a gated Task Run
+                description: Requires backend support for version overrides. Readiness checks remain enabled.
+                value:
+                  siteId: 60189e9c-7d12-438c-b9ca-6998d9c364b1
+                  name: Compute firmware 25.03 - reapply canary
+                  description: Reapply the configured version to the canary cohort.
+                  selector:
+                    percentage:
+                      percent: 10
+                      seed: fw-25-03-canary
+                  options:
+                    maxConcurrentTargets: 4
+                    safetyPolicy:
+                      gates:
+                        - failureRate:
+                            scope: currentPhase
+                            thresholdPercent: 10
+                        - failureCount:
+                            scope: cumulativeRun
+                            thresholdCount: 5
+                    conflictPolicy:
+                      retry:
+                        retryTimeout: 30m
+                        initialRetryDelay: 10s
+                        maxRetryDelay: 5m
+                    orderingPolicy:
+                      random:
+                        seed: fw-25-03-canary
+                    phasePolicy:
+                      equal:
+                        phaseCount: 2
+                      autoAdvance: false
+                  operation:
+                    firmware:
+                      version: 25.03.1
+                      subTargets:
+                        - bmc
+                        - bios
+                      overrideVersionCheck: true
       responses:
         '201':
           description: Task Run was created.
@@ -14579,6 +15140,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskRun'
+              examples:
+                created-run:
+                  summary: Initial create acknowledgement
+                  description: Create echoes the ID and request metadata with Pending status. It does not fetch the persisted operation
+                    code, phase count, or timestamps; retrieve the Task Run to read those values.
+                  value:
+                    id: 7a4c1e88-3d21-4f9b-b0c5-2e6d9f1a4b73
+                    name: Compute firmware 25.03 - 10% cohort
+                    description: Canary cohort ahead of the fleet-wide rollout.
+                    operationType: FirmwareControl
+                    operationCode: ''
+                    status: Pending
+                    statusReason: None
+                    statusMessage: ''
+                    totalPhases: 0
+                    created: '0001-01-01T00:00:00Z'
+                    updated: '0001-01-01T00:00:00Z'
+                    started: null
+                    finished: null
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
@@ -14870,16 +15450,17 @@ paths:
                   value:
                     - id: c1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f
                       runId: 7a4c1e88-3d21-4f9b-b0c5-2e6d9f1a4b73
-                      rackId: 0eadc9d8-d4ed-41ed-b687-0812d801dad8
+                      rackId: rack-01
                       sequenceIndex: 0
                       phaseIndex: 0
                       taskId: 9b8a7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d
                       status: Completed
                       created: '2026-08-10T14:02:44Z'
                       updated: '2026-08-10T14:39:02Z'
+                      message: ''
                     - id: d2e3f4a5-6b7c-4d8e-9f0a-1b2c3d4e5f60
                       runId: 7a4c1e88-3d21-4f9b-b0c5-2e6d9f1a4b73
-                      rackId: 4f7c2b19-8e3d-4a5f-9c1b-6d8e0a2f4b71
+                      rackId: rack-02
                       sequenceIndex: 1
                       phaseIndex: 0
                       taskId: a7b6c5d4-3e2f-4a1b-8c9d-0e1f2a3b4c5e
@@ -14889,13 +15470,14 @@ paths:
                       updated: '2026-08-10T15:47:03Z'
                     - id: e3f4a5b6-7c8d-4e9f-0a1b-2c3d4e5f6071
                       runId: 7a4c1e88-3d21-4f9b-b0c5-2e6d9f1a4b73
-                      rackId: 5a8d3c2b-9f4e-4b6a-8d1c-7e9f0b3a5c82
+                      rackId: rack-03
                       sequenceIndex: 2
                       phaseIndex: 1
                       taskId: null
                       status: Pending
                       created: '2026-08-10T14:02:44Z'
                       updated: '2026-08-10T14:02:44Z'
+                      message: ''
           headers:
             X-Pagination:
               schema:
@@ -15154,6 +15736,7 @@ paths:
         in: path
         required: true
         description: ID of the Rack
+        example: rack-01
     get:
       summary: Retrieve all Tasks for a Rack
       operationId: get-rack-tasks
@@ -15241,6 +15824,7 @@ paths:
         in: path
         required: true
         description: ID of the NVLink Domain
+        example: nvl5-gp1-jhb01
     patch:
       summary: Power control an NVLink Domain
       operationId: power-control-nvlink-domain
@@ -15262,6 +15846,12 @@ paths:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
                   state: Cycle
+              ac-power-cycle:
+                summary: Remove and restore AC power
+                description: Unsupported on Viking systems.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  state: ACPowerCycle
       responses:
         '200':
           description: OK
@@ -15309,9 +15899,19 @@ paths:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
                   domainIds:
-                    - 650e8400-e29b-41d4-a716-446655440001
-                    - 750e8400-e29b-41d4-a716-446655440002
-                  version: '24.11.0'
+                    - nvl5-gp1-jhb01
+                    - nvl5-gp2-jhb01
+                  version: 24.11.0
+              reapply-version:
+                summary: Reapply a configured firmware version
+                description: Assumes this version is available to the selected backend. Readiness checks remain enabled; the backend must
+                  support the version override.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  overrideVersionCheck: true
+                  domainIds:
+                    - nvl5-gp1-jhb01
       responses:
         '200':
           description: OK
@@ -15349,6 +15949,7 @@ paths:
         in: path
         required: true
         description: ID of the NVLink Domain
+        example: nvl5-gp1-jhb01
     patch:
       summary: Firmware update an NVLink Domain
       operationId: firmware-update-nvlink-domain
@@ -15366,10 +15967,18 @@ paths:
               with-version:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
-                  version: '24.11.0'
+                  version: 24.11.0
               default-version:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
+              reapply-version:
+                summary: Reapply a configured firmware version
+                description: Assumes this version is available to the selected backend. Readiness checks remain enabled; the backend must
+                  support the version override.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  overrideVersionCheck: true
       responses:
         '200':
           description: OK
@@ -15405,6 +16014,7 @@ paths:
         in: path
         required: true
         description: Component ID or component MAC address
+        example: fm100ht4v4mce2qstjnl8970nnj3ie6ecek4mtjn27pea4kre5gsa49jg0g
     get:
       summary: Retrieve a Tray
       operationId: get-tray
@@ -15448,11 +16058,12 @@ paths:
                       trayIdx: 0
                       hostId: 1
                     rackId: rack-01
-                    nvLinkDomainId: 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
+                    nvLinkDomainId: nvl5-gp1-jhb01
                     taskStats:
                       pendingTaskCount: 0
                       activeTaskCount: 0
                     health: null
+                    operationStatus: Ready
         '403':
           $ref: '#/components/responses/ForbiddenError'
         '404':
@@ -15531,6 +16142,7 @@ paths:
           in: query
           required: false
           description: Filter by component ID (mutually exclusive with rackId/rackName; use repeated params for multiple values)
+          example: fm100ht4v4mce2qstjnl8970nnj3ie6ecek4mtjn27pea4kre5gsa49jg0g
         - schema:
             type: integer
             format: int32
@@ -15578,6 +16190,7 @@ paths:
         in: path
         required: true
         description: Component ID of the Tray
+        example: fm100ht4v4mce2qstjnl8970nnj3ie6ecek4mtjn27pea4kre5gsa49jg0g
     get:
       summary: Retrieve all Tray health reports
       operationId: get-all-tray-health-report
@@ -15670,12 +16283,14 @@ paths:
         in: path
         required: true
         description: Component ID of the Tray
+        example: fm100ht4v4mce2qstjnl8970nnj3ie6ecek4mtjn27pea4kre5gsa49jg0g
       - schema:
           type: string
         name: source
         in: path
         required: true
         description: Health report source
+        example: overrides.sre
     delete:
       summary: Delete Tray health report
       operationId: delete-tray-health-report
@@ -15730,6 +16345,7 @@ paths:
         in: path
         required: true
         description: Component ID or component MAC address
+        example: fm100ht4v4mce2qstjnl8970nnj3ie6ecek4mtjn27pea4kre5gsa49jg0g
     get:
       summary: Validate a Tray
       operationId: validate-tray
@@ -15813,6 +16429,15 @@ paths:
                   filter:
                     rackId: rack-01
                   state: 'Off'
+              ac-power-cycle:
+                summary: Remove and restore AC power
+                description: Unsupported on Viking systems.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  state: ACPowerCycle
+                  filter:
+                    rackId: rack-01
+                    type: Compute
       responses:
         '200':
           description: OK
@@ -15847,6 +16472,7 @@ paths:
         in: path
         required: true
         description: Component ID or component MAC address
+        example: fm100ht4v4mce2qstjnl8970nnj3ie6ecek4mtjn27pea4kre5gsa49jg0g
     patch:
       summary: Power control a Tray
       operationId: power-control-tray
@@ -15876,6 +16502,12 @@ paths:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
                   state: Cycle
+              ac-power-cycle:
+                summary: Remove and restore AC power
+                description: Unsupported on Viking systems.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  state: ACPowerCycle
       responses:
         '200':
           description: OK
@@ -15933,7 +16565,29 @@ paths:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
                   filter:
                     rackId: rack-01
-                  version: '24.11.0'
+                  version: 24.11.0
+              reapply-version:
+                summary: Reapply a configured firmware version
+                description: Assumes this version is available to the selected backend. Readiness checks remain enabled; the backend must
+                  support the version override.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  overrideVersionCheck: true
+                  filter:
+                    rackId: rack-01
+                    type: Compute
+              authenticated-download:
+                summary: Shared firmware download credential
+                description: Replace the illustrative credential with the value expected by the configured firmware backend.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  authenticationData:
+                    shared: REPLACE_WITH_FIRMWARE_DOWNLOAD_TOKEN
+                  filter:
+                    rackId: rack-01
+                    type: NVSwitch
       responses:
         '200':
           description: OK
@@ -15968,6 +16622,7 @@ paths:
         in: path
         required: true
         description: Component ID or component MAC address
+        example: fm100ht4v4mce2qstjnl8970nnj3ie6ecek4mtjn27pea4kre5gsa49jg0g
     patch:
       summary: Firmware update a Tray
       operationId: firmware-update-tray
@@ -15985,10 +16640,26 @@ paths:
               with-version:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
-                  version: '24.11.0'
+                  version: 24.11.0
               without-version:
                 value:
                   siteId: 550e8400-e29b-41d4-a716-446655440000
+              reapply-version:
+                summary: Reapply a configured firmware version
+                description: Assumes this version is available to the selected backend. Readiness checks remain enabled; the backend must
+                  support the version override.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  overrideVersionCheck: true
+              authenticated-download:
+                summary: Shared firmware download credential
+                description: Replace the illustrative credential with the value expected by the configured firmware backend.
+                value:
+                  siteId: f97df110-f4de-492e-8849-4a6af68026b0
+                  version: 24.11.0
+                  authenticationData:
+                    shared: REPLACE_WITH_FIRMWARE_DOWNLOAD_TOKEN
       responses:
         '200':
           description: OK
@@ -16026,6 +16697,7 @@ paths:
         in: path
         required: true
         description: Component ID or component MAC address
+        example: fm100ht4v4mce2qstjnl8970nnj3ie6ecek4mtjn27pea4kre5gsa49jg0g
     get:
       summary: Retrieve all Tasks for a Tray
       operationId: get-tray-tasks
@@ -25855,7 +26527,7 @@ components:
           description: Primary compute rack
           operationStatus: Ready
           nvLinkDomainIds:
-            - 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
+            - nvl5-gp1-jhb01
           taskStats:
             pendingTaskCount: 0
             activeTaskCount: 0
@@ -25881,7 +26553,7 @@ components:
               hostId: 0
               bmcs:
                 - type: BmcTypeHost
-                  macAddress: 'AA:BB:CC:DD:EE:01'
+                  macAddress: AA:BB:CC:DD:EE:01
                   ipAddress: 10.0.0.101
               powerState: 'on'
               leakStatus: Leaking
@@ -25891,6 +26563,10 @@ components:
                 observedAt: '2026-09-28T12:00:00Z'
                 successes: []
                 alerts: []
+              rackId: rack-01
+              model: GB200
+              description: ''
+              operationStatus: Ready
       properties:
         id:
           type: string
@@ -26157,10 +26833,10 @@ components:
             hostId: 1
           bmcs:
             - type: BmcTypeHost
-              macAddress: '00:11:22:33:44:55'
+              macAddress: 00:11:22:33:44:55
               ipAddress: 192.168.1.100
           rackId: rack-01
-          nvLinkDomainId: 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
+          nvLinkDomainId: nvl5-gp1-jhb01
           taskStats:
             pendingTaskCount: 3
             activeTaskCount: 1
@@ -26169,6 +26845,7 @@ components:
             observedAt: '2026-09-28T12:00:00Z'
             successes: []
             alerts: []
+          operationStatus: Ready
       properties:
         id:
           type: string
@@ -26333,13 +27010,13 @@ components:
             $ref: '#/components/schemas/RackComponent'
           description: Components belonging to this Domain. Null when includeComponents is false; an empty array when requested but none are known.
       examples:
-        - id: group-01
-          rackGroupId: group-01
+        - id: nvl5-gp1-jhb01
+          rackGroupId: nvl5-gp1-jhb01
           nmxcClusterId: 59202b81-65fb-45ec-b3b8-91ab0ad3f34a
           name: ''
           topology: GB200_NVL72R1_C2G4
           operationStatus: Ready
-          components: []
+          components: null
     BatchUpdateNVLinkDomainPowerStateRequest:
       title: BatchUpdateNVLinkDomainPowerStateRequest
       type: object
@@ -26396,8 +27073,8 @@ components:
       examples:
         - siteId: 550e8400-e29b-41d4-a716-446655440000
           domainIds:
-            - 650e8400-e29b-41d4-a716-446655440001
-            - 750e8400-e29b-41d4-a716-446655440002
+            - nvl5-gp1-jhb01
+            - nvl5-gp2-jhb01
           state: Cycle
     NVLinkDomainFirmwareUpdateRequest:
       title: NVLinkDomainFirmwareUpdateRequest
@@ -26441,8 +27118,11 @@ components:
             maintenance.
       examples:
         - siteId: 550e8400-e29b-41d4-a716-446655440000
-          version: '24.11.0'
+          version: 24.11.0
         - siteId: 550e8400-e29b-41d4-a716-446655440000
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          version: 24.11.0
+          overrideVersionCheck: true
     BatchNVLinkDomainFirmwareUpdateRequest:
       title: BatchNVLinkDomainFirmwareUpdateRequest
       type: object
@@ -26496,9 +27176,14 @@ components:
       examples:
         - siteId: 550e8400-e29b-41d4-a716-446655440000
           domainIds:
-            - 650e8400-e29b-41d4-a716-446655440001
-            - 750e8400-e29b-41d4-a716-446655440002
-          version: '24.11.0'
+            - nvl5-gp1-jhb01
+            - nvl5-gp2-jhb01
+          version: 24.11.0
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          version: 24.11.0
+          overrideVersionCheck: true
+          domainIds:
+            - nvl5-gp1-jhb01
     BatchUpdateRackPowerStateRequest:
       title: BatchUpdateRackPowerStateRequest
       type: object
@@ -26649,6 +27334,13 @@ components:
             on the owning rack for rack-scoped components) are reported as not
             ready by their persisted status. Intended for operator-supervised
             maintenance.
+      examples:
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          version: 24.11.0
+          overrideVersionCheck: true
+          filter:
+            names:
+              - Rack-01
     BringUpRackRequest:
       title: BringUpRackRequest
       type: object
@@ -26892,6 +27584,69 @@ components:
           type: string
           format: date-time
           description: Timestamp when the rule was last updated.
+      examples:
+        - name: Power on - shelves, then switches, then compute
+          description: Verifies each component type reached the on state before the next stage starts.
+          operationType: PowerControl
+          operationCode: power_on
+          ruleDefinition:
+            version: v1
+            steps:
+              - componentType: PowerShelf
+                stage: 1
+                maxParallel: 0
+                timeout: 15m
+                retry:
+                  maxAttempts: 3
+                  initialInterval: 5s
+                  backoffCoefficient: 2
+                  maxInterval: 1m
+                mainOperation:
+                  name: PowerControl
+                postOperation:
+                  - name: VerifyPowerStatus
+                    timeout: 5m
+                    pollInterval: 10s
+                    parameters:
+                      expected_status: 'on'
+              - componentType: NVSwitch
+                stage: 2
+                maxParallel: 0
+                timeout: 15m
+                retry:
+                  maxAttempts: 3
+                  initialInterval: 5s
+                  backoffCoefficient: 2
+                mainOperation:
+                  name: PowerControl
+                postOperation:
+                  - name: VerifyPowerStatus
+                    timeout: 5m
+                    pollInterval: 10s
+                    parameters:
+                      expected_status: 'on'
+              - componentType: Compute
+                stage: 3
+                maxParallel: 8
+                timeout: 20m
+                retry:
+                  maxAttempts: 3
+                  initialInterval: 1s
+                  backoffCoefficient: 2
+                mainOperation:
+                  name: PowerControl
+                postOperation:
+                  - name: VerifyReachability
+                    timeout: 10m
+                    pollInterval: 30s
+                    parameters:
+                      component_types:
+                        - Compute
+                      require_all: true
+          id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+          isDefault: false
+          created: '2026-09-30T12:00:00Z'
+          updated: '2026-09-30T12:00:00Z'
     RuleDefinition:
       title: RuleDefinition
       type: object
@@ -27194,6 +27949,20 @@ components:
           description: |-
             Derived per-phase outcome stats. Present only on the single-Task-Run
             `GET` when `includeStats=true`; omitted otherwise.
+      examples:
+        - id: 7a4c1e88-3d21-4f9b-b0c5-2e6d9f1a4b73
+          name: Compute firmware 25.03 - 10% cohort
+          description: Canary cohort ahead of the fleet-wide rollout.
+          operationType: FirmwareControl
+          operationCode: upgrade
+          status: Running
+          statusReason: None
+          statusMessage: ''
+          totalPhases: 2
+          created: '2026-09-30T12:00:00Z'
+          updated: '2026-09-30T12:00:01Z'
+          started: '2026-09-30T12:00:01Z'
+          finished: null
     TaskRunStats:
       title: TaskRunStats
       type: object
@@ -27674,6 +28443,12 @@ components:
             everything in the bundle. Unknown names are rejected.
           items:
             type: string
+      examples:
+        - version: 25.03.1
+          subTargets:
+            - bmc
+            - bios
+          overrideVersionCheck: true
     TaskReportV1:
       title: TaskReportV1
       type: object
@@ -27897,8 +28672,16 @@ components:
         - siteId: 550e8400-e29b-41d4-a716-446655440000
           filter:
             type: NVSwitch
-          version: '24.11.0'
-          targets: [bmc, nvos]
+          version: 24.11.0
+          targets:
+            - bmc
+            - nvos
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          version: 24.11.0
+          overrideVersionCheck: true
+          filter:
+            rackId: rack-01
+            type: Compute
     UpdatePowerStateRequest:
       title: UpdatePowerStateRequest
       type: object
@@ -28109,11 +28892,16 @@ components:
             maintenance.
       examples:
         - siteId: 550e8400-e29b-41d4-a716-446655440000
-          version: '24.11.0'
+          version: 24.11.0
         - siteId: 550e8400-e29b-41d4-a716-446655440000
-          version: '24.11.0'
-          targets: [bmc, nvos]
+          version: 24.11.0
+          targets:
+            - bmc
+            - nvos
         - siteId: 550e8400-e29b-41d4-a716-446655440000
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          version: 24.11.0
+          overrideVersionCheck: true
     FirmwareUpdateResponse:
       title: FirmwareUpdateResponse
       type: object
@@ -29554,12 +30342,14 @@ components:
         - siteId: f97df110-f4de-492e-8849-4a6af68026b0
           expectedMachines:
             - siteId: f97df110-f4de-492e-8849-4a6af68026b0
-              bmcMacAddress: '00:1A:2B:3C:4D:5E'
+              bmcMacAddress: 00:1A:2B:3C:4D:5E
               chassisSerialNumber: CHASSIS-12345
               defaultBmcUsername: admin
               defaultBmcPassword: password123
               labels:
                 rack: A1
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          expectedMachines: []
       properties:
         siteId:
           type: string
@@ -29920,12 +30710,14 @@ components:
         - siteId: f97df110-f4de-492e-8849-4a6af68026b0
           expectedPowerShelves:
             - siteId: f97df110-f4de-492e-8849-4a6af68026b0
-              bmcMacAddress: '00:1A:2B:3C:4D:70'
+              bmcMacAddress: 00:1A:2B:3C:4D:70
               shelfSerialNumber: SHELF-12345
               defaultBmcUsername: admin
               defaultBmcPassword: password123
               labels:
                 rack: A1
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          expectedPowerShelves: []
       properties:
         siteId:
           type: string
@@ -30064,7 +30856,7 @@ components:
         - id: 497f6eca-6276-4993-bfeb-53cbbbba6f08
           rackId: rack-01
           siteId: f97df110-f4de-492e-8849-4a6af68026b0
-          rackProfileId: rp-standard-42u
+          rackProfileId: GB200_NVL72R1_C2G4_NVIDIA
           name: Rack 01
           description: Production rack in row A
           labels:
@@ -30077,6 +30869,7 @@ components:
             location.position: A1
           created: '2019-08-24T14:15:22Z'
           updated: '2019-08-24T14:15:22Z'
+          rackGroupId: nvl5-gp1-jhb01
       properties:
         id:
           type: string
@@ -30201,6 +30994,8 @@ components:
                 chassis.model: GB200-NVL72
                 location.datacenter: phx-dc01
                 location.position: A2
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          expectedRacks: []
       properties:
         siteId:
           type: string
@@ -30296,11 +31091,26 @@ components:
           racks:
             - rackId: rack-01
               members:
+                - type: Compute
+                  manufacturer: NVIDIA
+                  id: compute-01
                 - type: NVSwitch
                   manufacturer: NVIDIA
                   id: switch-01
+                - type: PowerShelf
+                  manufacturer: NVIDIA
+                  id: powershelf-01
             - rackId: rack-02
-              members: []
+              members:
+                - type: Compute
+                  manufacturer: NVIDIA
+                  id: compute-02
+                - type: NVSwitch
+                  manufacturer: NVIDIA
+                  id: switch-02
+                - type: PowerShelf
+                  manufacturer: NVIDIA
+                  id: powershelf-02
           name: NVL rack group 1
           description: Production NVL rack group in row A
           labels:
@@ -30313,6 +31123,7 @@ components:
             location.position: A1
           created: '2019-08-24T14:15:22Z'
           updated: '2019-08-24T14:15:22Z'
+          site: null
       properties:
         id:
           type: string
@@ -30378,11 +31189,26 @@ components:
           racks:
             - rackId: rack-01
               members:
+                - type: Compute
+                  manufacturer: NVIDIA
+                  id: compute-01
                 - type: NVSwitch
                   manufacturer: NVIDIA
                   id: switch-01
+                - type: PowerShelf
+                  manufacturer: NVIDIA
+                  id: powershelf-01
             - rackId: rack-02
-              members: []
+              members:
+                - type: Compute
+                  manufacturer: NVIDIA
+                  id: compute-02
+                - type: NVSwitch
+                  manufacturer: NVIDIA
+                  id: switch-02
+                - type: PowerShelf
+                  manufacturer: NVIDIA
+                  id: powershelf-02
           name: NVL rack group 1
           description: Production NVL rack group in row A
           labels:
@@ -30449,7 +31275,29 @@ components:
             - siteId: f97df110-f4de-492e-8849-4a6af68026b0
               rackGroupId: nvl5-gp1-jhb01
               topology: gb200_nvl72r1_c2g4
-              racks: [{rackId: rack-01, members: []}, {rackId: rack-02, members: []}]
+              racks:
+                - rackId: rack-01
+                  members:
+                    - type: Compute
+                      manufacturer: NVIDIA
+                      id: compute-01
+                    - type: NVSwitch
+                      manufacturer: NVIDIA
+                      id: switch-01
+                    - type: PowerShelf
+                      manufacturer: NVIDIA
+                      id: powershelf-01
+                - rackId: rack-02
+                  members:
+                    - type: Compute
+                      manufacturer: NVIDIA
+                      id: compute-02
+                    - type: NVSwitch
+                      manufacturer: NVIDIA
+                      id: switch-02
+                    - type: PowerShelf
+                      manufacturer: NVIDIA
+                      id: powershelf-02
               name: NVL rack group 1
               description: Production NVL rack group in row A
               labels:
@@ -30461,7 +31309,29 @@ components:
             - siteId: f97df110-f4de-492e-8849-4a6af68026b0
               rackGroupId: nvl5-gp2-jhb01
               topology: gb200_nvl72r1_c2g4
-              racks: [{rackId: rack-03, members: []}, {rackId: rack-04, members: []}]
+              racks:
+                - rackId: rack-03
+                  members:
+                    - type: Compute
+                      manufacturer: NVIDIA
+                      id: compute-03
+                    - type: NVSwitch
+                      manufacturer: NVIDIA
+                      id: switch-03
+                    - type: PowerShelf
+                      manufacturer: NVIDIA
+                      id: powershelf-03
+                - rackId: rack-04
+                  members:
+                    - type: Compute
+                      manufacturer: NVIDIA
+                      id: compute-04
+                    - type: NVSwitch
+                      manufacturer: NVIDIA
+                      id: switch-04
+                    - type: PowerShelf
+                      manufacturer: NVIDIA
+                      id: powershelf-04
               name: NVL rack group 2
               description: Production NVL rack group in row A
               labels:
@@ -30470,6 +31340,8 @@ components:
                 chassis.model: GB200-NVL72
                 location.datacenter: phx-dc01
                 location.position: A2
+        - siteId: f97df110-f4de-492e-8849-4a6af68026b0
+          expectedRackGroups: []
       properties:
         siteId:
           type: string
@@ -30515,7 +31387,40 @@ components:
         - `location.region`, `location.datacenter`, `location.room`, `location.position`
       examples:
         - topology: gb300_nvl72r1_c2g4
-          racks: [{rackId: rack-01, members: []}, {rackId: rack-02, members: []}, {rackId: rack-03, members: []}]
+          racks:
+            - rackId: rack-01
+              members:
+                - type: Compute
+                  manufacturer: NVIDIA
+                  id: compute-01
+                - type: NVSwitch
+                  manufacturer: NVIDIA
+                  id: switch-01
+                - type: PowerShelf
+                  manufacturer: NVIDIA
+                  id: powershelf-01
+            - rackId: rack-02
+              members:
+                - type: Compute
+                  manufacturer: NVIDIA
+                  id: compute-02
+                - type: NVSwitch
+                  manufacturer: NVIDIA
+                  id: switch-02
+                - type: PowerShelf
+                  manufacturer: NVIDIA
+                  id: powershelf-02
+            - rackId: rack-03
+              members:
+                - type: Compute
+                  manufacturer: NVIDIA
+                  id: compute-03
+                - type: NVSwitch
+                  manufacturer: NVIDIA
+                  id: switch-03
+                - type: PowerShelf
+                  manufacturer: NVIDIA
+                  id: powershelf-03
           name: NVL rack group 1 (updated)
           description: Production NVL rack group in row A, expanded membership
           labels:
@@ -30583,9 +31488,15 @@ components:
       examples:
         - rackId: rack-01
           members:
+            - type: Compute
+              manufacturer: NVIDIA
+              id: compute-01
             - type: NVSwitch
               manufacturer: NVIDIA
               id: switch-01
+            - type: PowerShelf
+              manufacturer: NVIDIA
+              id: powershelf-01
       properties:
         rackId:
           type: string
@@ -30861,10 +31772,10 @@ components:
         - siteId: f97df110-f4de-492e-8849-4a6af68026b0
           expectedSwitches:
             - siteId: f97df110-f4de-492e-8849-4a6af68026b0
-              bmcMacAddress: '00:1A:2B:3C:4D:60'
+              bmcMacAddress: 00:1A:2B:3C:4D:60
               switchSerialNumber: SWITCH-12345
               nvosMacAddresses:
-                - '00:1A:2B:3C:4D:61'
+                - 00:1A:2B:3C:4D:61
               defaultBmcUsername: admin
               defaultBmcPassword: password123
               labels:
