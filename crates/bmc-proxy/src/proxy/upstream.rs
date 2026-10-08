@@ -29,9 +29,14 @@ use carbide_utils::HostPortPair;
 use http::{HeaderMap, Method, Response, StatusCode, Uri};
 use rpc::forge_api_client::ForgeApiClient;
 use trace_propagation::is_propagated_header;
+use url::Url;
 
 use crate::class::DEFAULT_UPSTREAM_TIMEOUT;
-use crate::metrics::{MethodLabel, UpstreamRequestCompleted, UpstreamStatus};
+use crate::config::RedirectMode;
+use crate::metrics::{
+    MethodLabel, RedirectDisposition, RedirectObserved, RedirectStatus, RedirectTarget,
+    UpstreamRequestCompleted, UpstreamStatus,
+};
 use crate::proxy::credentials::{
     BmcCredentials, CredentialCache, REDFISH_AUTH_TOKEN_HEADER, get_bmc_credentials,
 };
@@ -55,6 +60,10 @@ const MIN_UPLOAD_BANDWIDTH_BYTES_PER_SEC: u64 = 10_000;
 /// hours covers any real firmware image at the floor rate.
 const MAX_UPLOAD_TIMEOUT: Duration = Duration::from_secs(4 * 60 * 60);
 
+/// Match the redirect limit used before redirect targets were restricted to
+/// the original request's origin.
+const MAX_REDIRECTS: usize = 5;
+
 /// The caller's request body, in a form the proxy can attach to an upstream
 /// request -- and, when buffered, attach again for one retry.
 pub(super) enum UpstreamBody {
@@ -75,6 +84,30 @@ pub(super) enum UpstreamBody {
 pub(super) struct UpstreamResponse {
     pub(super) response: reqwest::Response,
     pub(super) sensitive_values: Vec<String>,
+}
+
+/// An attempt that got no answer from the BMC: the caller's answer, and how
+/// the BMC failed it, if the proxy did not fail it first.
+pub(super) struct AttemptFailed {
+    pub(super) response: Response<Body>,
+    pub(super) by_bmc: Option<BmcFailure>,
+}
+
+/// How the BMC failed an attempt.
+pub(super) enum BmcFailure {
+    /// The proxy could not connect to it.
+    Unreachable,
+    /// It did not answer within the attempt's `budget`.
+    TimedOut { budget: Duration },
+}
+
+impl From<Response<Body>> for AttemptFailed {
+    fn from(response: Response<Body>) -> Self {
+        Self {
+            response,
+            by_bmc: None,
+        }
+    }
 }
 
 impl UpstreamBody {
@@ -128,11 +161,9 @@ impl UpstreamBody {
                 body,
                 declared_length,
             } => {
-                // A streamed body cannot be replayed, so reqwest's redirect
-                // layer forwards a BMC 307/308 to the caller as-is instead of
-                // following it the way buffered requests do. Callers pushing
-                // firmware should use the canonical UpdateService URI rather
-                // than rely on redirects.
+                // A streamed body cannot be replayed, so reqwest returns a
+                // BMC 307/308 without following it. The response layer then
+                // applies the normal Location safety and rewriting rules.
                 let body = body.take().ok_or_else(|| {
                     ProxyError::from((
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -160,7 +191,7 @@ pub(super) async fn send_upstream(
     path_and_query: http::uri::PathAndQuery,
     upstream_body: &mut UpstreamBody,
     deadline: tokio::time::Instant,
-) -> Result<UpstreamResponse, Response<Body>> {
+) -> Result<UpstreamResponse, AttemptFailed> {
     let mut bmc_client_info = tokio::time::timeout_at(
         deadline,
         create_client(
@@ -202,11 +233,9 @@ pub(super) async fn send_upstream(
         .map_err(|e| {
             error_response((StatusCode::BAD_GATEWAY, format!("invalid credentials: {e}")).into())
         })?;
+    let budget = deadline.saturating_duration_since(tokio::time::Instant::now());
     let upstream_request = upstream_body
-        .attach(
-            upstream_request,
-            deadline.saturating_duration_since(tokio::time::Instant::now()),
-        )
+        .attach(upstream_request, budget)
         .map_err(error_response)?;
 
     let started = Instant::now();
@@ -221,7 +250,18 @@ pub(super) async fn send_upstream(
             response,
             sensitive_values,
         })
-        .map_err(|e| error_response((StatusCode::BAD_GATEWAY, e.to_string()).into()))
+        .map_err(|error| AttemptFailed {
+            by_bmc: match &error {
+                reqwest_middleware::Error::Reqwest(cause) if cause.is_connect() => {
+                    Some(BmcFailure::Unreachable)
+                }
+                reqwest_middleware::Error::Reqwest(cause) if cause.is_timeout() => {
+                    Some(BmcFailure::TimedOut { budget })
+                }
+                _ => None,
+            },
+            response: error_response((StatusCode::BAD_GATEWAY, error.to_string()).into()),
+        })
 }
 
 fn copy_request_headers(source: &HeaderMap, dest: &mut HeaderMap) {
@@ -290,7 +330,7 @@ struct BmcClientInfo {
 /// genuinely strings; the BMC's own typed `IpAddr` is bracketed off its enum
 /// variant by the caller and passes through unchanged (as do IPv4 addresses
 /// and hostnames).
-fn build_authority(host: Cow<'_, str>, port: Option<u16>) -> Cow<'_, str> {
+pub(super) fn build_authority(host: Cow<'_, str>, port: Option<u16>) -> Cow<'_, str> {
     let host = if host.parse::<Ipv6Addr>().is_ok() {
         Cow::Owned(format!("[{host}]"))
     } else {
@@ -350,8 +390,9 @@ async fn create_client(
     })
 }
 
-pub(super) fn build_http_client() -> Result<reqwest_middleware::ClientWithMiddleware, BmcProxyError>
-{
+pub(super) fn build_http_client(
+    redirect_mode: RedirectMode,
+) -> Result<reqwest_middleware::ClientWithMiddleware, BmcProxyError> {
     let client = reqwest::Client::builder()
         // Keep the proxy's error-sanitization boundary explicit even if a
         // workspace dependency enables a reqwest decompression feature later.
@@ -360,7 +401,7 @@ pub(super) fn build_http_client() -> Result<reqwest_middleware::ClientWithMiddle
         .no_deflate()
         .no_zstd()
         .danger_accept_invalid_certs(true)
-        .redirect(reqwest::redirect::Policy::limited(5))
+        .redirect(redirect_policy(redirect_mode))
         .connect_timeout(std::time::Duration::from_secs(5)) // Limit connections to 5 seconds
         // A backstop: every request sets its own budget when its body is attached.
         .timeout(DEFAULT_UPSTREAM_TIMEOUT)
@@ -376,24 +417,90 @@ pub(super) fn build_http_client() -> Result<reqwest_middleware::ClientWithMiddle
         .build())
 }
 
+/// Builds the Reqwest policy that preserves its redirect method and body
+/// handling while preventing credentials from crossing an origin boundary.
+fn redirect_policy(mode: RedirectMode) -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(move |attempt| {
+        if mode == RedirectMode::ReturnToClient {
+            return attempt.stop();
+        }
+
+        let target = attempt
+            .previous()
+            .first()
+            .map_or(RedirectTarget::Invalid, |origin| {
+                classify_redirect_target(origin, attempt.url())
+            });
+        if target != RedirectTarget::SameOrigin {
+            return attempt.stop();
+        }
+
+        let status = RedirectStatus::from(attempt.status());
+        if attempt.previous().len() > MAX_REDIRECTS {
+            emit(RedirectObserved {
+                mode,
+                status,
+                target,
+                disposition: RedirectDisposition::LimitExceeded,
+            });
+            return attempt.error("too many same-origin BMC redirects");
+        }
+
+        emit(RedirectObserved {
+            mode,
+            status,
+            target,
+            disposition: RedirectDisposition::Followed,
+        });
+        attempt.follow()
+    })
+}
+
+/// Classifies a resolved HTTP(S) redirect target against the given origin.
+/// Other schemes are invalid; matching compares scheme, host, and effective port.
+pub(super) fn classify_redirect_target(origin: &Url, target: &Url) -> RedirectTarget {
+    if !matches!(target.scheme(), "http" | "https") {
+        return RedirectTarget::Invalid;
+    }
+    if target.scheme() == origin.scheme()
+        && target.host_str() == origin.host_str()
+        && target.port_or_known_default() == origin.port_or_known_default()
+    {
+        RedirectTarget::SameOrigin
+    } else {
+        RedirectTarget::CrossOrigin
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
     use std::net::{IpAddr, Ipv4Addr};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
+    use axum::Router;
     use axum::body::Body;
+    use axum::extract::{OriginalUri, State};
     use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
+    use axum::routing::get;
     use carbide_test_support::Outcome::Yields;
     use carbide_test_support::{Case, Check, check_cases_async, check_values, value_scenarios};
     use carbide_utils::HostPortPair;
     use rpc::forge_api_client::ForgeApiClient;
     use rpc::forge_tls_client::{ApiConfig, ForgeClientConfig};
+    use tokio::task::JoinSet;
+    use tokio_util::sync::CancellationToken;
+    use url::Url;
 
     use super::{
         MAX_BUFFERED_BODY_SIZE, UpstreamBody, build_authority, build_http_client,
-        copy_request_headers, create_client, is_hop_by_hop_header, method_supports_body,
+        classify_redirect_target, copy_request_headers, create_client, is_hop_by_hop_header,
+        method_supports_body,
     };
+    use crate::config::RedirectMode;
+    use crate::metrics::RedirectTarget;
     use crate::proxy::credentials::{BmcCredentials, CREDENTIAL_CACHE_IDLE_TTL, CredentialCache};
     use crate::proxy::idle_bounded_cache;
     use crate::proxy::test_support::*;
@@ -427,6 +534,156 @@ mod tests {
         base_upstream_uri: String,
         forwarded_header: Option<String>,
         credentials: CredentialSummary,
+    }
+
+    async fn spawn_http(
+        app: Router,
+        tasks: &mut JoinSet<std::io::Result<()>>,
+        shutdown: CancellationToken,
+    ) -> std::net::SocketAddr {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test HTTP server");
+        let address = listener.local_addr().expect("test server address");
+        tasks.spawn(async move {
+            axum::serve(listener, app)
+                .with_graceful_shutdown(shutdown.cancelled_owned())
+                .await
+        });
+        address
+    }
+
+    async fn stop_http(tasks: &mut JoinSet<std::io::Result<()>>, shutdown: &CancellationToken) {
+        shutdown.cancel();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(result) = tasks.join_next().await {
+                result
+                    .expect("test HTTP server task did not panic")
+                    .expect("test HTTP server stopped successfully");
+            }
+        })
+        .await
+        .expect("test HTTP servers stop within five seconds");
+    }
+
+    #[test]
+    fn redirect_targets_require_an_exact_http_origin_match() {
+        value_scenarios!(
+            run = |(origin, target): (&str, &str)| classify_redirect_target(
+                &Url::parse(origin).expect("origin URL"),
+                &Url::parse(target).expect("target URL"),
+            );
+
+            "same effective origin" {
+                ("https://bmc.example/redfish/v1", "https://bmc.example:443/Systems")
+                    => RedirectTarget::SameOrigin,
+            }
+
+            "another host" {
+                ("https://bmc.example/redfish/v1", "https://other.example/Systems")
+                    => RedirectTarget::CrossOrigin,
+            }
+
+            "another port" {
+                ("https://bmc.example/redfish/v1", "https://bmc.example:8443/Systems")
+                    => RedirectTarget::CrossOrigin,
+            }
+
+            "another scheme" {
+                ("https://bmc.example/redfish/v1", "http://bmc.example/Systems")
+                    => RedirectTarget::CrossOrigin,
+            }
+
+            "unsupported scheme" {
+                ("https://bmc.example/redfish/v1", "ftp://bmc.example/Systems")
+                    => RedirectTarget::Invalid,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn upstream_client_does_not_follow_cross_origin_redirect() {
+        let mut servers = JoinSet::new();
+        let shutdown = CancellationToken::new();
+        let _shutdown_guard = shutdown.clone().drop_guard();
+        let destination_hits = Arc::new(AtomicUsize::new(0));
+        let destination = Router::new()
+            .route(
+                "/target",
+                get(|State(hits): State<Arc<AtomicUsize>>| async move {
+                    hits.fetch_add(1, Ordering::SeqCst);
+                    StatusCode::OK
+                }),
+            )
+            .with_state(destination_hits.clone());
+        let destination = spawn_http(destination, &mut servers, shutdown.clone()).await;
+        let location = format!("http://{destination}/target");
+        let source = Router::new().route(
+            "/start",
+            get(move || {
+                let location = location.clone();
+                async move {
+                    (
+                        StatusCode::TEMPORARY_REDIRECT,
+                        [(axum::http::header::LOCATION, location)],
+                    )
+                }
+            }),
+        );
+        let source = spawn_http(source, &mut servers, shutdown.clone()).await;
+
+        let response = build_http_client(RedirectMode::FollowSameOrigin)
+            .expect("HTTP client builds")
+            .get(format!("http://{source}/start"))
+            .header("x-auth-token", "must-not-leak")
+            .send()
+            .await
+            .expect("source response returned");
+
+        assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(destination_hits.load(Ordering::SeqCst), 0);
+        drop(response);
+        stop_http(&mut servers, &shutdown).await;
+    }
+
+    #[tokio::test]
+    async fn upstream_client_stops_after_five_same_origin_redirects() {
+        let mut servers = JoinSet::new();
+        let shutdown = CancellationToken::new();
+        let _shutdown_guard = shutdown.clone().drop_guard();
+        let requests = Arc::new(AtomicUsize::new(0));
+        let chain =
+            Router::new()
+                .route(
+                    "/{step}",
+                    get(
+                        |State(requests): State<Arc<AtomicUsize>>,
+                         OriginalUri(uri): OriginalUri| async move {
+                            requests.fetch_add(1, Ordering::SeqCst);
+                            let step = uri
+                                .path()
+                                .trim_start_matches('/')
+                                .parse::<usize>()
+                                .expect("numeric redirect step");
+                            (
+                                StatusCode::TEMPORARY_REDIRECT,
+                                [(axum::http::header::LOCATION, format!("/{}", step + 1))],
+                            )
+                        },
+                    ),
+                )
+                .with_state(requests.clone());
+        let chain = spawn_http(chain, &mut servers, shutdown.clone()).await;
+
+        build_http_client(RedirectMode::FollowSameOrigin)
+            .expect("HTTP client builds")
+            .get(format!("http://{chain}/0"))
+            .send()
+            .await
+            .expect_err("sixth redirect exceeds the configured limit");
+
+        assert_eq!(requests.load(Ordering::SeqCst), 6);
+        stop_http(&mut servers, &shutdown).await;
     }
 
     fn header_for_copy_case(case: HeaderCopyCase) -> (HeaderName, HeaderValue) {
@@ -537,7 +794,7 @@ mod tests {
             ip,
             &api_client,
             &credential_cache,
-            build_http_client().expect("test HTTP client builds"),
+            build_http_client(RedirectMode::FollowSameOrigin).expect("test HTTP client builds"),
             &proxy_override(case),
         )
         .await
@@ -812,7 +1069,8 @@ mod tests {
     async fn observe_attached_body(
         declared_length: Option<u64>,
     ) -> Result<AttachedBodySummary, String> {
-        let client = build_http_client().map_err(|e| e.to_string())?;
+        let client =
+            build_http_client(RedirectMode::FollowSameOrigin).map_err(|e| e.to_string())?;
         let mut headers = HeaderMap::new();
         if let Some(length) = declared_length {
             headers.insert(
@@ -962,7 +1220,7 @@ mod tests {
     // replayable.
     #[tokio::test]
     async fn only_buffered_or_absent_bodies_are_replayable() {
-        let client = build_http_client().expect("http client");
+        let client = build_http_client(RedirectMode::FollowSameOrigin).expect("http client");
         let post = || client.post("https://bmc.invalid/redfish/v1/Systems");
 
         let mut none = UpstreamBody::None;

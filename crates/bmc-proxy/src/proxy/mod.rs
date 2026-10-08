@@ -22,7 +22,8 @@
 //!
 //! - `ingress`: accepts connections over TLS. The proxy's own identity and
 //!   trusted CAs are reloaded from disk on the first connection after five
-//!   minutes. A client certificate is optional here.
+//!   minutes. Failed reloads retain the previous configuration and retry after
+//!   thirty seconds. A client certificate is optional here.
 //! - `guard`: identifies the caller from its certificate, then checks the
 //!   principal allow-list and the per-principal ACL.
 //! - `target`: resolves the BMC the `Forwarded` header names to its IP.
@@ -47,6 +48,7 @@ mod end_to_end_tests;
 mod guard;
 mod ingress;
 mod response;
+mod slo;
 mod target;
 #[cfg(test)]
 mod test_support;
@@ -61,10 +63,10 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::middleware::from_fn_with_state;
 use axum::response::IntoResponse;
-use axum::routing::{any, get};
+use axum::routing::any;
 use carbide_instrument::emit;
 use forge_tls::client_config::ClientCert;
-use http::{Request, Response, StatusCode};
+use http::{Method, Request, Response, StatusCode};
 use moka::future::Cache as MokaCache;
 use rpc::forge_api_client::ForgeApiClient;
 use rpc::forge_tls_client::{ApiConfig, ForgeClientConfig};
@@ -73,19 +75,22 @@ use tokio_util::sync::CancellationToken;
 use trace_propagation::set_span_parent_from_headers;
 use tracing::Instrument;
 
+use crate::class::RequestClass;
+use crate::config::Trip;
 use crate::metrics::{MethodLabel, UpstreamAuthRetried};
-use crate::proxy::admission::Admission;
+use crate::proxy::admission::{Admission, Slot};
 use crate::proxy::credentials::{
     CREDENTIAL_CACHE_IDLE_TTL, CredentialCache, evict_cached_credentials, get_bmc_credentials,
 };
 use crate::proxy::guard::{authorize_proxy_request, cert_description_layer};
 use crate::proxy::ingress::{BmcProxy, RefreshableTlsAcceptor};
-use crate::proxy::response::{build_response, prepare_response_body};
+use crate::proxy::response::{BmcOrigins, build_response, prepare_response_body};
 use crate::proxy::target::{
     IP_CACHE_TTL, LookupToIpCache, forwarded_header_value, ip_for_forwarded_target,
 };
 use crate::proxy::upstream::{
-    UpstreamBody, UpstreamResponse, build_http_client, method_supports_body, send_upstream,
+    AttemptFailed, BmcFailure, UpstreamBody, UpstreamResponse, build_http_client,
+    method_supports_body, send_upstream,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -184,18 +189,15 @@ pub(crate) async fn start(
         join_set,
     );
     let state = BmcProxyState {
+        http_client: build_http_client(config.redirects.mode)?,
         config,
         api_client,
         credential_cache: idle_bounded_cache(CREDENTIAL_CACHE_IDLE_TTL),
-        http_client: build_http_client()?,
         ip_cache: bounded_cache(IP_CACHE_TTL),
         admission,
     };
 
-    let app = Router::new()
-        .route("/", get(root_url))
-        .route("/{*path}", any(proxy_request))
-        .with_state(state.clone())
+    let app = proxy_routes(state.clone())
         .layer(from_fn_with_state(state.clone(), authorize_proxy_request))
         .layer(cert_description_layer::<()>(&state.config.auth)?);
 
@@ -218,7 +220,17 @@ pub(crate) async fn start(
     Ok(())
 }
 
-async fn root_url() -> &'static str {
+/// Builds the production route table before transport authorization layers are
+/// applied.
+fn proxy_routes(state: BmcProxyState) -> Router {
+    Router::new()
+        .route("/", any(root_or_proxy))
+        .route("/{*path}", any(proxy_request))
+        .with_state(state)
+}
+
+/// Returns the build banner served by an untargeted `GET /`.
+fn root_url() -> &'static str {
     const ROOT_CONTENTS: &str = if carbide_version::literal!(build_version).is_empty() {
         "Carbide BMC proxy development build\n"
     } else {
@@ -229,6 +241,35 @@ async fn root_url() -> &'static str {
         )
     };
     ROOT_CONTENTS
+}
+
+/// Serves the proxy banner only when `/` is not targeted at a BMC.
+///
+/// A returned same-BMC redirect can legitimately name `/`; a request carrying
+/// `Forwarded` must therefore enter the proxy path and receive normal ACL
+/// handling. Malformed `Forwarded` values also fail closed in that path.
+async fn root_or_proxy(
+    State(state): State<BmcProxyState>,
+    request: Request<Body>,
+) -> Result<Response<Body>, Response<Body>> {
+    if request.headers().contains_key("forwarded") {
+        return proxy_request(State(state), request).await;
+    }
+    if request.method() == Method::GET {
+        return Ok(root_url().into_response());
+    }
+    if request.method() == Method::HEAD {
+        let mut response = root_url().into_response();
+        *response.body_mut() = Body::empty();
+        return Ok(response);
+    }
+
+    let mut response = StatusCode::METHOD_NOT_ALLOWED.into_response();
+    response.headers_mut().insert(
+        http::header::ALLOW,
+        http::HeaderValue::from_static("GET,HEAD"),
+    );
+    Ok(response)
 }
 
 async fn proxy_request(
@@ -267,7 +308,9 @@ fn bmc_proxy_request_span<B>(request: &Request<B>) -> tracing::Span {
 /// The OpenTelemetry status for a proxied request that answered with `status`.
 ///
 /// Only a 5xx marks the span failed: a rejected or malformed request is the caller's error, and
-/// counting it against the proxy would bury the hops that actually broke.
+/// counting it against the proxy would bury the hops that actually broke. A request refused with
+/// `429` for want of a slot at its BMC leaves the span ok too;
+/// `carbide_bmc_proxy_admission_refused_total` counts those.
 fn span_status(status: StatusCode) -> &'static str {
     if status.is_server_error() {
         "error"
@@ -280,13 +323,14 @@ async fn proxy_request_inner(
     state: BmcProxyState,
     request: Request<Body>,
 ) -> Result<Response<Body>, Response<Body>> {
-    if !state.allows(&request) {
+    let arrived = tokio::time::Instant::now();
+    let Some(principals) = state.authorized_caller(&request) else {
         return Ok(error_response((StatusCode::FORBIDDEN, "Forbidden").into()));
-    }
+    };
     let class = state
         .config
         .classes
-        .classify(request.method(), request.uri().path());
+        .classify(request.method(), request.uri().path(), &principals);
     tracing::Span::current().record("bmc_proxy.class", class.name.as_str());
     let (parts, body) = request.into_parts();
     let forwarded_target = forwarded_header_value(&parts.headers)
@@ -361,18 +405,18 @@ async fn proxy_request_inner(
         )
     })?
     .map_err(|e| error_response((StatusCode::BAD_GATEWAY, e.to_string()).into()))?;
-    let slot = state
+    let streamed = !upstream_body.is_replayable();
+    let mut slot = state
         .admission
         .acquire(
             target_ip,
             class,
+            arrived,
             deadline,
             upstream_body.exchange_bound(class.upstream_timeout),
         )
         .await
-        .map_err(|refused| {
-            error_response((StatusCode::SERVICE_UNAVAILABLE, refused.to_string()).into())
-        })?;
+        .map_err(|refused| error_response((refused.status(), refused.to_string()).into()))?;
     let mut upstream_response = send_upstream(
         &state,
         target_ip,
@@ -381,7 +425,8 @@ async fn proxy_request_inner(
         &mut upstream_body,
         deadline,
     )
-    .await?;
+    .await
+    .map_err(|failed| answer_failed_attempt(&mut slot, failed, class, streamed))?;
 
     // A BMC that rejects the credential the proxy cached (an expired Redfish
     // session, a rotated password) gets one replay with freshly resolved
@@ -404,7 +449,8 @@ async fn proxy_request_inner(
             &mut upstream_body,
             tokio::time::Instant::now() + class.upstream_timeout,
         )
-        .await?;
+        .await
+        .map_err(|failed| answer_failed_attempt(&mut slot, failed, class, streamed))?;
     }
 
     let UpstreamResponse {
@@ -412,7 +458,10 @@ async fn proxy_request_inner(
         sensitive_values,
     } = upstream_response;
     let status = response.status();
+    report(&mut slot, class, Trip::Status(status));
+    slot.answered();
     let headers = response.headers().clone();
+    let origins = BmcOrigins::new(response.url().clone(), target_ip);
     let body = prepare_response_body(
         status,
         &headers,
@@ -425,7 +474,59 @@ async fn proxy_request_inner(
         evict_cached_credentials(target_ip, &state.credential_cache).await;
     }
 
-    Ok(build_response(status, &headers, body).map(|body| slot.hold_until_sent(body)))
+    Ok(build_response(
+        status,
+        &headers,
+        body,
+        &origins,
+        &parts.method,
+        state.config.redirects.mode,
+        &sensitive_values,
+    )
+    .map(|body| slot.hold_until_sent(body)))
+}
+
+/// The caller's answer to an attempt that got no answer. Reports an attempt
+/// the BMC failed: one the proxy could not connect for, or one the BMC did
+/// not answer within at least half its class's budget. A shorter attempt was
+/// cut short by the wait for its slot, and a timed-out upload, `streamed`,
+/// may have been the caller's. Against the class's latency target, an
+/// attempt that timed out counts as long as the request took, and one the
+/// proxy could not connect for, or failed on its own, does not count.
+fn answer_failed_attempt(
+    slot: &mut Slot,
+    failed: AttemptFailed,
+    class: &RequestClass,
+    streamed: bool,
+) -> Response<Body> {
+    if !matches!(failed.by_bmc, Some(BmcFailure::TimedOut { .. })) {
+        slot.unmeasured();
+    }
+    let ended = match failed.by_bmc {
+        Some(BmcFailure::Unreachable) => Some(Trip::Unreachable),
+        Some(BmcFailure::TimedOut { budget })
+            if !streamed && budget >= class.upstream_timeout / 2 =>
+        {
+            Some(Trip::Timeout)
+        }
+        _ => None,
+    };
+    if let Some(ended) = ended {
+        report(slot, class, ended);
+    }
+    failed.response
+}
+
+/// Counts an exchange that ended as `ended` against `class`'s breaker at the
+/// BMC, through `slot`, when the class's `trip_on` names it.
+fn report(slot: &mut Slot, class: &RequestClass, ended: Trip) {
+    if class
+        .breaker
+        .as_ref()
+        .is_some_and(|breaker| breaker.trips_on(ended))
+    {
+        slot.bmc_failed();
+    }
 }
 
 fn error_response(error: ProxyError) -> Response<Body> {
@@ -455,10 +556,74 @@ impl From<(StatusCode, &'static str)> for ProxyError {
 
 #[cfg(test)]
 mod tests {
-    use axum::http::{Request, StatusCode};
+    use axum::body::Body;
+    use axum::http::{HeaderValue, Method, Request, StatusCode};
+    use carbide_authn::middleware::{AuthContext, Principal};
     use carbide_test_support::value_scenarios;
+    use tower::ServiceExt;
 
-    use super::{bmc_proxy_request_span, span_status};
+    use super::{bmc_proxy_request_span, proxy_routes, span_status};
+    use crate::proxy::test_support::test_state_with_config;
+
+    const ROOT_ROUTE_TEST_CONFIG: &str = r#"
+        allowed_principals = ["spiffe-service-id/forge-system/carbide-api"]
+
+        [tls]
+        identity_pemfile_path = ""
+        identity_keyfile_path = ""
+        root_cafile_path = ""
+        admin_root_cafile_path = ""
+
+        [auth]
+
+        [auth.acls]
+        "spiffe-service-id/forge-system/carbide-api" = ["GET /**"]
+    "#;
+
+    #[tokio::test]
+    async fn root_dispatches_targeted_requests_to_the_proxy() {
+        let state = test_state_with_config(ROOT_ROUTE_TEST_CONFIG);
+        let app = proxy_routes(state);
+
+        let banner = Request::builder()
+            .method(Method::GET)
+            .uri("/")
+            .body(Body::empty())
+            .expect("banner request builds");
+        assert_eq!(
+            app.clone().oneshot(banner).await.unwrap().status(),
+            StatusCode::OK
+        );
+
+        let mut targeted = Request::builder()
+            .method(Method::GET)
+            .uri("/")
+            .header("forwarded", "host=not-an-ip-address")
+            .body(Body::empty())
+            .expect("targeted request builds");
+        targeted.extensions_mut().insert(AuthContext::<()> {
+            principals: vec![Principal::SpiffeServiceIdentifier(
+                "forge-system/carbide-api".to_string(),
+            )],
+            authorization: None,
+        });
+        assert_eq!(
+            app.clone().oneshot(targeted).await.unwrap().status(),
+            StatusCode::BAD_REQUEST
+        );
+
+        let post = Request::builder()
+            .method(Method::POST)
+            .uri("/")
+            .body(Body::empty())
+            .expect("POST request builds");
+        let post = app.oneshot(post).await.unwrap();
+        assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(
+            post.headers().get(http::header::ALLOW),
+            Some(&HeaderValue::from_static("GET,HEAD"))
+        );
+    }
 
     #[test]
     fn proxy_request_span_continues_inbound_trace_on_upstream_inject() {
