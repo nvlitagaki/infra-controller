@@ -368,7 +368,10 @@ async fn allocate_pkey(
                 "pkey",
                 &err,
             );
-            Err(err.into())
+            match err {
+                ResourcePoolDatabaseError::Database(error) => Err((*error).into()),
+                err => Err(err.into()),
+            }
         }
     }
 }

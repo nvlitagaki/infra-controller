@@ -1471,6 +1471,69 @@ async fn create_fnn_vpc_requires_existing_tenant(
 }
 
 #[crate::sqlx_test]
+async fn create_vpc_rejects_explicit_vni_in_automatic_only_pool(
+    pool: sqlx::PgPool,
+) -> Result<(), eyre::Report> {
+    let env =
+        create_test_env_with_overrides(pool, TestEnvOverrides::default().with_fnn_config(None))
+            .await;
+    let tenant = create_fixture_tenant(&env, "automatic-vni-only").await?;
+    sqlx::query("UPDATE resource_pool SET auto_assign = true WHERE name = $1")
+        .bind(env.common_pools.ethernet.pool_vpc_vni.name())
+        .execute(&env.pool)
+        .await?;
+    let before = vpc_vni_pool_state(&env).await?;
+
+    let error = env
+        .api
+        .create_vpc(
+            VpcCreationRequest::builder(&tenant.organization_id)
+                .metadata(rpc::forge::Metadata {
+                    name: "explicit-vni".to_string(),
+                    ..Default::default()
+                })
+                .vni(20001u32)
+                .tonic_request(),
+        )
+        .await
+        .expect_err("automatic-only pools must reject explicit VNIs");
+    assert_eq!(error.code(), tonic::Code::FailedPrecondition);
+    assert!(error.message().contains("VNI `20001` cannot be requested"));
+    assert_eq!(vpc_vni_pool_state(&env).await?, before);
+
+    let automatic = env
+        .api
+        .create_vpc(
+            VpcCreationRequest::builder(&tenant.organization_id)
+                .metadata(rpc::forge::Metadata {
+                    name: "automatic-vni".to_string(),
+                    ..Default::default()
+                })
+                .tonic_request(),
+        )
+        .await?
+        .into_inner();
+    assert!(
+        automatic
+            .status
+            .as_ref()
+            .and_then(|status| status.vni)
+            .is_some()
+    );
+    let persisted_ids = env
+        .api
+        .find_vpc_ids(tonic::Request::new(rpc::forge::VpcSearchFilter {
+            tenant_org_id: Some(tenant.organization_id),
+            ..Default::default()
+        }))
+        .await?
+        .into_inner()
+        .vpc_ids;
+    assert_eq!(persisted_ids, vec![automatic.id.expect("created VPC ID")]);
+    Ok(())
+}
+
+#[crate::sqlx_test]
 #[allow(deprecated)]
 async fn create_vpc(pool: sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
     // Build an FNN config with distinct access tiers so the create path
