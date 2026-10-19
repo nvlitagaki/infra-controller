@@ -95,6 +95,23 @@ impl PageContext {
         }
     }
 
+    /// Creates navigation for a backend page with an exact total item count.
+    pub(super) fn from_total(
+        current_page: usize,
+        limit: usize,
+        total_items: usize,
+        path: impl Into<String>,
+    ) -> Self {
+        Self::new(
+            PaginationInfo {
+                current_page,
+                limit,
+                total_items,
+            },
+            path,
+        )
+    }
+
     /// Create a PageContext from a pre-computed page count (for handlers that
     /// perform database-level pagination and don't know the total item count).
     pub(super) fn from_page_count(
@@ -168,7 +185,7 @@ impl PageContext {
 }
 
 /// Resolve raw pagination params into a concrete `current_page` and `limit`.
-fn resolve_params(params: &PaginationParams) -> (usize, usize) {
+pub(super) fn resolve_params(params: &PaginationParams) -> (usize, usize) {
     let current_page = params.current_page.unwrap_or(0);
     let limit = params
         .limit

@@ -2524,15 +2524,11 @@ pub async fn set_dpu_agent_upgrade_requested(
     Ok(())
 }
 
-pub async fn find_machine_ids<ID>(
-    txn: impl DbReader<'_>,
+fn machine_ids_query(
+    select: &str,
     search_config: MachineSearchConfig,
-) -> Result<Vec<ID>, DatabaseError>
-where
-    ID: TryFrom<MachineId>,
-    DatabaseError: From<<ID as TryFrom<MachineId>>::Error>,
-{
-    let mut qb = sqlx::QueryBuilder::new("SELECT id FROM machines");
+) -> sqlx::QueryBuilder<Postgres> {
+    let mut qb = sqlx::QueryBuilder::new(select);
 
     if search_config.mnnvl_only {
         qb.push(" INNER JOIN machine_topologies mt ON machines.id = mt.machine_id");
@@ -2592,7 +2588,7 @@ where
         qb.push(" AND health_reports->'merges' ? ");
         qb.push_bind(ovrrd_str.clone());
         qb.push(" AND jsonb_array_length(health_reports->'merges'->");
-        qb.push_bind(ovrrd_str);
+        qb.push_bind(ovrrd_str.clone());
         qb.push("->'alerts') > 0");
     }
     if search_config.mnnvl_only {
@@ -2627,9 +2623,50 @@ where
         qb.push_bind(state);
     }
 
-    if search_config.for_update {
-        qb.push(" ORDER BY id ");
-        qb.push(" FOR UPDATE");
+    qb
+}
+
+/// Selects a page of matching IDs and the total count before pagination.
+///
+/// Orders by full ID using bytewise collation, then applies `offset` and `limit`.
+/// The caller must use a repeatable-read transaction to keep both queries in
+/// one snapshot. No machine details are loaded here.
+pub async fn list_machine_ids(
+    txn: &mut PgConnection,
+    search_config: MachineSearchConfig,
+    offset: i64,
+    limit: u32,
+) -> Result<(Vec<MachineId>, i64), DatabaseError> {
+    let total_count = machine_ids_query("SELECT COUNT(*) FROM machines", search_config.clone())
+        .build_query_scalar::<i64>()
+        .fetch_one(&mut *txn)
+        .await
+        .map_err(|e| DatabaseError::new("list_machine_ids_count", e))?;
+    let mut query = machine_ids_query("SELECT id FROM machines", search_config);
+    query.push(" ORDER BY id COLLATE \"C\" LIMIT ");
+    query.push_bind(i64::from(limit));
+    query.push(" OFFSET ");
+    query.push_bind(offset);
+    let ids = query
+        .build_query_as::<MachineId>()
+        .fetch_all(txn)
+        .await
+        .map_err(|e| DatabaseError::new("list_machine_ids", e))?;
+    Ok((ids, total_count))
+}
+
+pub async fn find_machine_ids<ID>(
+    txn: impl DbReader<'_>,
+    search_config: MachineSearchConfig,
+) -> Result<Vec<ID>, DatabaseError>
+where
+    ID: TryFrom<MachineId>,
+    DatabaseError: From<<ID as TryFrom<MachineId>>::Error>,
+{
+    let for_update = search_config.for_update;
+    let mut qb = machine_ids_query("SELECT id FROM machines", search_config);
+    if for_update {
+        qb.push(" ORDER BY id FOR UPDATE");
     }
 
     let q = qb.build_query_as();

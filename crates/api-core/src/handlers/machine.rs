@@ -119,6 +119,40 @@ pub(crate) async fn find_machine_ids_by_bmc_ips(
     Ok(Response::new(rpc_pairs))
 }
 
+pub(crate) async fn find_machine_ids_page(
+    api: &Api,
+    request: Request<rpc::FindMachineIdsPageRequest>,
+) -> Result<Response<rpc::FindMachineIdsPageResponse>, Status> {
+    log_request_data(&request);
+    let request = request.into_inner();
+    let limit = if request.limit == 0 {
+        50
+    } else {
+        request.limit
+    };
+    if limit > 100 {
+        return Err(CarbideError::InvalidArgument("limit must be at most 100".into()).into());
+    }
+    let offset = i64::try_from(request.offset)
+        .map_err(|_| CarbideError::InvalidArgument("offset must be at most INT64_MAX".into()))?;
+    let search_config = request.search_config.unwrap_or_default();
+    let search_config = search_config.try_into()?;
+    let mut txn = api.txn_begin().await?;
+    // Keep count and page membership consistent within this request.
+    let query = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY";
+    sqlx::query(query)
+        .execute(txn.as_pgconn())
+        .await
+        .map_err(|e| db::DatabaseError::new(query, e))?;
+    let (machine_ids, total_count) =
+        db::machine::list_machine_ids(txn.as_pgconn(), search_config, offset, limit).await?;
+    txn.commit().await?;
+    Ok(Response::new(rpc::FindMachineIdsPageResponse {
+        machine_ids,
+        total_count: total_count as u64,
+    }))
+}
+
 pub(crate) async fn find_machines_by_ids(
     api: &Api,
     request: Request<::rpc::forge::MachinesByIdsRequest>,

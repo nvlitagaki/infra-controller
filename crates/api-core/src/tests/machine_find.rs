@@ -516,6 +516,103 @@ async fn test_find_machine_ids_with_and_without_dpus(pool: sqlx::PgPool) {
 }
 
 #[crate::sqlx_test]
+async fn test_find_machine_ids_page(pool: sqlx::PgPool) {
+    let env = create_test_env(pool).await;
+    let empty = env
+        .api
+        .find_machine_ids_page(tonic::Request::new(
+            rpc::forge::FindMachineIdsPageRequest::default(),
+        ))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(empty.machine_ids.is_empty());
+    assert_eq!(empty.total_count, 0);
+
+    let mut hosts = Vec::<MachineId>::new();
+    let mut dpus = Vec::<MachineId>::new();
+    for _ in 0..3 {
+        let snapshot =
+            site_explorer::new_host(&env, ManagedHostConfig::default().with_dpu_count(2))
+                .await
+                .unwrap();
+        hosts.push(snapshot.host_snapshot.id.into());
+        dpus.extend(
+            snapshot
+                .dpu_snapshots
+                .iter()
+                .map(|dpu| MachineId::from(dpu.id)),
+        );
+    }
+    hosts.sort_unstable_by_key(ToString::to_string);
+    dpus.sort_unstable_by_key(ToString::to_string);
+    let mut all = [hosts.clone(), dpus.clone()].concat();
+    all.sort_unstable_by_key(ToString::to_string);
+    // Filtering must precede pagination; host IDs must not consume DPU page slots.
+    for (include_dpus, exclude_hosts, expected) in [
+        (false, false, hosts),
+        (true, true, dpus),
+        (true, false, all),
+    ] {
+        for _ in 0..2 {
+            let mut actual = Vec::new();
+            for offset in (0..expected.len() + 4).step_by(4) {
+                let page = env
+                    .api
+                    .find_machine_ids_page(tonic::Request::new(
+                        rpc::forge::FindMachineIdsPageRequest {
+                            search_config: Some(rpc::forge::MachineSearchConfig {
+                                include_dpus,
+                                exclude_hosts,
+                                ..Default::default()
+                            }),
+                            offset: offset as u64,
+                            limit: 4,
+                        },
+                    ))
+                    .await
+                    .unwrap()
+                    .into_inner();
+                assert_eq!(page.total_count as usize, expected.len());
+                let ids = page.machine_ids;
+                assert_eq!(
+                    ids,
+                    expected
+                        .iter()
+                        .skip(offset)
+                        .take(4)
+                        .copied()
+                        .collect::<Vec<_>>()
+                );
+                actual.extend(ids);
+            }
+            assert_eq!(
+                actual, expected,
+                "complete traversals must contain each matching ID once"
+            );
+        }
+    }
+
+    for request in [
+        rpc::forge::FindMachineIdsPageRequest {
+            limit: 101,
+            ..Default::default()
+        },
+        rpc::forge::FindMachineIdsPageRequest {
+            offset: u64::MAX,
+            ..Default::default()
+        },
+    ] {
+        let err = env
+            .api
+            .find_machine_ids_page(tonic::Request::new(request))
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+}
+
+#[crate::sqlx_test]
 async fn test_find_all_machines_when_there_arent_any(pool: sqlx::PgPool) {
     let machines = db::machine::find(
         &pool,

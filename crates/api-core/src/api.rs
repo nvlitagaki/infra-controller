@@ -1005,6 +1005,13 @@ impl Forge for Api {
         crate::handlers::machine::find_machine_ids(self, request).await
     }
 
+    async fn find_machine_ids_page(
+        &self,
+        request: Request<rpc::FindMachineIdsPageRequest>,
+    ) -> Result<Response<rpc::FindMachineIdsPageResponse>, Status> {
+        crate::handlers::machine::find_machine_ids_page(self, request).await
+    }
+
     async fn find_machines_by_ids(
         &self,
         request: Request<::rpc::forge::MachinesByIdsRequest>,

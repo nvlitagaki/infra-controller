@@ -297,6 +297,7 @@ impl InternalRBACRules {
                 SiteHealthProbe,
             ],
         );
+        x.perm("FindMachineIdsPage", vec![ForgeAdminCLI]);
         x.perm("FindConnectedDevicesByDpuMachineIds", vec![ForgeAdminCLI]);
         x.perm("FindMachineIdsByBmcIps", vec![ForgeAdminCLI, Flow]);
         x.perm("FindMachineHealthHistories", vec![ForgeAdminCLI, SiteAgent]);
@@ -1504,6 +1505,24 @@ mod rbac_rule_tests {
                 "InsertSwitchHealthReport",
             ]
         );
+    }
+
+    #[test]
+    fn machine_pages_are_restricted_to_admin_cli() {
+        let admin = Principal::ExternalUser(ExternalUserInfo::new(
+            None,
+            "nico-admin-cli".to_string(),
+            None,
+        ));
+        assert!(InternalRBACRules::allowed_from_static(
+            "FindMachineIdsPage",
+            &[admin]
+        ));
+        let agent = Principal::SpiffeMachineIdentifier("dpu".to_string());
+        assert!(!InternalRBACRules::allowed_from_static(
+            "FindMachineIdsPage",
+            &[agent]
+        ));
     }
 
     #[test]

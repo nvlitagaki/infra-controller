@@ -138,6 +138,7 @@ const (
 	Forge_FindIpAddress_FullMethodName                                      = "/forge.Forge/FindIpAddress"
 	Forge_FindMachineIds_FullMethodName                                     = "/forge.Forge/FindMachineIds"
 	Forge_FindMachinesByIds_FullMethodName                                  = "/forge.Forge/FindMachinesByIds"
+	Forge_FindMachineIdsPage_FullMethodName                                 = "/forge.Forge/FindMachineIdsPage"
 	Forge_FindMachineStateHistories_FullMethodName                          = "/forge.Forge/FindMachineStateHistories"
 	Forge_FindMachineHealthHistories_FullMethodName                         = "/forge.Forge/FindMachineHealthHistories"
 	Forge_FindPowerShelfStateHistories_FullMethodName                       = "/forge.Forge/FindPowerShelfStateHistories"
@@ -782,6 +783,9 @@ type ForgeClient interface {
 	FindIpAddress(ctx context.Context, in *FindIpAddressRequest, opts ...grpc.CallOption) (*FindIpAddressResponse, error)
 	FindMachineIds(ctx context.Context, in *MachineSearchConfig, opts ...grpc.CallOption) (*MachineIdList, error)
 	FindMachinesByIds(ctx context.Context, in *MachinesByIdsRequest, opts ...grpc.CallOption) (*MachineList, error)
+	// Returns one filtered ID page ordered by full machine ID ascending.
+	// Offset pages are stable for unchanged inventory, not a cross-request snapshot.
+	FindMachineIdsPage(ctx context.Context, in *FindMachineIdsPageRequest, opts ...grpc.CallOption) (*FindMachineIdsPageResponse, error)
 	FindMachineStateHistories(ctx context.Context, in *MachineStateHistoriesRequest, opts ...grpc.CallOption) (*MachineStateHistories, error)
 	FindMachineHealthHistories(ctx context.Context, in *MachineHealthHistoriesRequest, opts ...grpc.CallOption) (*HealthHistories, error)
 	FindPowerShelfStateHistories(ctx context.Context, in *PowerShelfStateHistoriesRequest, opts ...grpc.CallOption) (*StateHistories, error)
@@ -2776,6 +2780,16 @@ func (c *forgeClient) FindMachinesByIds(ctx context.Context, in *MachinesByIdsRe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MachineList)
 	err := c.cc.Invoke(ctx, Forge_FindMachinesByIds_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *forgeClient) FindMachineIdsPage(ctx context.Context, in *FindMachineIdsPageRequest, opts ...grpc.CallOption) (*FindMachineIdsPageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FindMachineIdsPageResponse)
+	err := c.cc.Invoke(ctx, Forge_FindMachineIdsPage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7252,6 +7266,9 @@ type ForgeServer interface {
 	FindIpAddress(context.Context, *FindIpAddressRequest) (*FindIpAddressResponse, error)
 	FindMachineIds(context.Context, *MachineSearchConfig) (*MachineIdList, error)
 	FindMachinesByIds(context.Context, *MachinesByIdsRequest) (*MachineList, error)
+	// Returns one filtered ID page ordered by full machine ID ascending.
+	// Offset pages are stable for unchanged inventory, not a cross-request snapshot.
+	FindMachineIdsPage(context.Context, *FindMachineIdsPageRequest) (*FindMachineIdsPageResponse, error)
 	FindMachineStateHistories(context.Context, *MachineStateHistoriesRequest) (*MachineStateHistories, error)
 	FindMachineHealthHistories(context.Context, *MachineHealthHistoriesRequest) (*HealthHistories, error)
 	FindPowerShelfStateHistories(context.Context, *PowerShelfStateHistoriesRequest) (*StateHistories, error)
@@ -8429,6 +8446,9 @@ func (UnimplementedForgeServer) FindMachineIds(context.Context, *MachineSearchCo
 }
 func (UnimplementedForgeServer) FindMachinesByIds(context.Context, *MachinesByIdsRequest) (*MachineList, error) {
 	return nil, status.Error(codes.Unimplemented, "method FindMachinesByIds not implemented")
+}
+func (UnimplementedForgeServer) FindMachineIdsPage(context.Context, *FindMachineIdsPageRequest) (*FindMachineIdsPageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FindMachineIdsPage not implemented")
 }
 func (UnimplementedForgeServer) FindMachineStateHistories(context.Context, *MachineStateHistoriesRequest) (*MachineStateHistories, error) {
 	return nil, status.Error(codes.Unimplemented, "method FindMachineStateHistories not implemented")
@@ -11784,6 +11804,24 @@ func _Forge_FindMachinesByIds_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ForgeServer).FindMachinesByIds(ctx, req.(*MachinesByIdsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Forge_FindMachineIdsPage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FindMachineIdsPageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ForgeServer).FindMachineIdsPage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Forge_FindMachineIdsPage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ForgeServer).FindMachineIdsPage(ctx, req.(*FindMachineIdsPageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -19889,6 +19927,10 @@ var Forge_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FindMachinesByIds",
 			Handler:    _Forge_FindMachinesByIds_Handler,
+		},
+		{
+			MethodName: "FindMachineIdsPage",
+			Handler:    _Forge_FindMachineIdsPage_Handler,
 		},
 		{
 			MethodName: "FindMachineStateHistories",

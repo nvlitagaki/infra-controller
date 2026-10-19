@@ -274,6 +274,9 @@ service Forge {
   rpc FindIpAddress(FindIpAddressRequest) returns (FindIpAddressResponse);
   rpc FindMachineIds(MachineSearchConfig) returns (common.MachineIdList);
   rpc FindMachinesByIds(MachinesByIdsRequest) returns (MachineList);
+  // Returns one filtered ID page ordered by full machine ID ascending.
+  // Offset pages are stable for unchanged inventory, not a cross-request snapshot.
+  rpc FindMachineIdsPage(FindMachineIdsPageRequest) returns (FindMachineIdsPageResponse);
   rpc FindMachineStateHistories(MachineStateHistoriesRequest) returns (MachineStateHistories);
   rpc FindMachineHealthHistories(MachineHealthHistoriesRequest) returns (HealthHistories);
   rpc FindPowerShelfStateHistories(PowerShelfStateHistoriesRequest) returns (StateHistories);
@@ -12150,4 +12153,27 @@ message ExpectedNvLinkDomainsByIdsRequest {
 
 message ExpectedNvLinkDomainList {
   repeated ExpectedNvLinkDomain domains = 1;
+}
+
+// Selects a bounded, deterministically ordered page of managed machine IDs.
+message FindMachineIdsPageRequest {
+  // Same filters as MachineSearchConfig. Omission uses its defaults (hosts
+  // only, excluding predicted hosts). include_history has no effect on IDs.
+  MachineSearchConfig search_config = 1;
+  // Number of records to skip after filtering and sorting. Defaults to zero.
+  // Values greater than INT64_MAX return INVALID_ARGUMENT.
+  uint64 offset = 2;
+  // Maximum records to return: 1 through 100. Zero defaults to 50.
+  // Values greater than 100 return INVALID_ARGUMENT.
+  uint32 limit = 3;
+}
+
+// A page from a single database snapshot, sorted by full machine ID ascending
+// using bytewise ordering. Inventory changes can shift subsequent offset pages.
+message FindMachineIdsPageResponse {
+  // At most the requested limit of matching IDs. Retrieve details with
+  // FindMachinesByIds; its response order is not guaranteed to match this page.
+  repeated common.MachineId machine_ids = 1;
+  // Count matching the filters before pagination, including on empty pages.
+  uint64 total_count = 2;
 }
