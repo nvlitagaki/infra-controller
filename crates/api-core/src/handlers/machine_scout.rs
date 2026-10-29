@@ -415,6 +415,8 @@ pub(crate) async fn forge_agent_control(
                 reprovision_state:
                     HostReprovisionState::WaitingForScoutUpgrade {
                         task_json,
+                        deadline,
+                        delivery,
                         result: None,
                         ..
                     },
@@ -426,6 +428,8 @@ pub(crate) async fn forge_agent_control(
                         reprovision_state:
                             HostReprovisionState::WaitingForScoutUpgrade {
                                 task_json,
+                                deadline,
+                                delivery,
                                 result: None,
                                 ..
                             },
@@ -437,7 +441,22 @@ pub(crate) async fn forge_agent_control(
                 );
                 let action = match serde_json::from_str::<sfu::ScoutFirmwareUpgradeTask>(task_json)
                 {
-                    Ok(task) => Action::FirmwareUpgrade(fac::FirmwareUpgrade { task: Some(task) }),
+                    Ok(_)
+                        if delivery.as_ref().is_some_and(|delivery| {
+                            let active_deadline = if delivery.accepted_at.is_some() {
+                                *deadline
+                            } else {
+                                delivery.deadline
+                            };
+                            chrono::Utc::now() > active_deadline
+                        }) =>
+                    {
+                        Action::noop()
+                    }
+                    Ok(task) => Action::FirmwareUpgrade(fac::FirmwareUpgrade {
+                        task: Some(task),
+                        requires_acknowledgement: delivery.is_some(),
+                    }),
                     Err(e) => {
                         tracing::warn!(
                             error = %e,
@@ -483,6 +502,14 @@ fn build_agent_control_response(
     action: fac::Action,
     capabilities: &[i32],
 ) -> Result<ForgeAgentControlResponse, CarbideError> {
+    if matches!(&action, fac::Action::FirmwareUpgrade(task) if task.requires_acknowledgement)
+        && !capabilities
+            .contains(&(rpc::ForgeAgentControlCapability::ScoutFirmwareUpgradeAckV1 as i32))
+    {
+        return Err(CarbideError::FailedPrecondition(
+            "scout does not advertise SCOUT_FIRMWARE_UPGRADE_ACK_V1".into(),
+        ));
+    }
     let requires_firmware_update = match &action {
         fac::Action::MlxAction(action) => action.device_actions.iter().any(|device| {
             matches!(

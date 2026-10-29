@@ -850,6 +850,7 @@ TOML section: `[extension_service_state_controller]`.
 | `firmware_download_cache_directory` | `PathBuf` | `/mnt/persistence/fw/download-cache` | Writable directory used to cache downloaded firmware artifacts. |
 | `downloads` | `FirmwareDownloadConfig` | *(see below)* | Shared downloader limits, applied at Core startup. |
 | `host_firmware_upgrade_retry_interval` | `Duration` | `60m` | Retry delay for failed host firmware upgrades. |
+| `scout_upgrade_acknowledgement_enabled` | `bool` | `false` | Create new Scout firmware tasks with separate delivery and completion deadlines. Enable only after all Core replicas and affected Scouts support acknowledgement. Requires a Core restart; persisted tasks keep their existing behavior. |
 | `instance_updates_manual_tagging` | `bool` | `true` | Require manual tagging before firmware updates. |
 | `no_reset_retries` | `bool` | `false` | Disable retry logic after BMC resets. |
 | `hgx_bmc_gpu_reboot_delay` | `Duration` | `30s` | Delay after GPU reboot before HGX BMC access. |

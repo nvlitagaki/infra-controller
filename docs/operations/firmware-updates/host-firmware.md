@@ -252,6 +252,46 @@ The route precedence is:
 For the packaged CX7 Scout route on DGX H100, refer to
 [ConnectX-7 firmware configuration](configuration.md#connectx-7-infiniband-firmware).
 
+Acknowledgement is enabled for new tasks by setting
+`firmware_global.scout_upgrade_acknowledgement_enabled = true`. The setting
+defaults to `false`, preserving legacy task creation during rolling upgrades.
+Use this deployment order:
+
+1. Upgrade every Core API replica with the setting omitted, and update the
+   Scouts that will receive firmware tasks. Older Core versions do not
+   understand the new field; strict configuration validation rejects it even
+   when it is set to `false`.
+1. After no old Core replicas remain, set it to `true` and restart Core. All
+   upgraded replicas understand both task formats, including replicas still
+   using the disabled setting during this second rollout.
+
+When enabled, new Scout tasks have a separate 30-minute delivery deadline. Scout
+must advertise
+`SCOUT_FIRMWARE_UPGRADE_ACK_V1` and successfully acknowledge the task before
+downloading or running it. The completion budget starts at that first
+acknowledgement: script download time, the download timeout for each artifact,
+the script execution timeout, and 30 minutes of reporting slack, capped at five
+hours. Polling and repeated acknowledgements do not extend either deadline.
+Tasks persisted without acknowledgement metadata retain their original deadline
+and delivery behavior. Scouts without the capability cannot receive tasks that
+require acknowledgement. Changing the setting affects only new tasks; existing
+tasks keep their persisted protocol and deadlines.
+
+Before rolling Core back to a version without acknowledgement support, disable
+the setting on every replica and wait for all acknowledgement-required tasks to
+leave `WaitingForScoutUpgrade`. Then remove the setting before deploying the old
+version. Disabling the setting alone does not convert in-flight tasks.
+
+An expired delivery deadline means Scout did not accept the task. After
+acceptance, a missing completion report means the execution outcome is unknown;
+it does not prove the script timed out. Scout reports an execution timeout when
+its script exceeds the configured limit. While the same Scout process remains
+running, redelivery of a completed task retries its report without running the
+script again. If a completed task was received without an acknowledgement
+requirement, a later delivery requiring it is acknowledged before replaying the
+result. Failed acknowledgement retries retain the completion record. This
+completion record does not survive a Scout restart.
+
 All successful routes eventually return to component selection. Scout and
 Redfish updates first pass through NICo's activation and inventory-verification
 states; the legacy script path returns directly to inventory checking.
@@ -316,7 +356,7 @@ The principal host firmware substates are:
 |---|---|
 | `CheckingFirmwareV2`, `CheckingFirmwareRepeatV2` | Refresh inventory and select the next mismatched component. |
 | `WaitingForManualUpgrade` | Wait for completion of the approved platform procedure. |
-| `WaitingForScoutUpgrade` | Wait for Scout to execute the packaged upgrade task and report its result. |
+| `WaitingForScoutUpgrade` | Wait for Scout to execute the packaged task and report its result. Tasks created with acknowledgement enabled first wait for acceptance, with separate delivery and completion deadlines. |
 | `WaitingForScript` | Wait for the legacy Core-local script. |
 | `WaitingForUpload` | A Redfish upload is running asynchronously. |
 | `WaitingForFirmwareUpgrade` | The upload completed and NICo is polling the Redfish task. |

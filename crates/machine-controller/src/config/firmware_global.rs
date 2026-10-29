@@ -80,6 +80,12 @@ pub struct FirmwareGlobal {
         serialize_with = "as_duration"
     )]
     pub host_firmware_upgrade_retry_interval: Duration,
+    /// Creates Scout tasks with separate delivery and completion deadlines.
+    /// Enable only after all Core API replicas and the affected Scouts support
+    /// acknowledgement. Defaults to false for staged rolling upgrades; changing
+    /// this setting requires a Core restart and affects only newly created tasks.
+    #[serde(default)]
+    pub scout_upgrade_acknowledgement_enabled: bool,
     /// Requires manual tagging of instances before
     /// firmware updates are applied.
     #[serde(default = "FirmwareGlobal::instance_updates_manual_tagging_default")]
@@ -119,6 +125,7 @@ impl FirmwareGlobal {
             firmware_download_cache_directory: PathBuf::default(),
             downloads: FirmwareDownloadConfig::default(),
             host_firmware_upgrade_retry_interval: Self::get_retry_interval(),
+            scout_upgrade_acknowledgement_enabled: false,
             instance_updates_manual_tagging: false,
             no_reset_retries: false,
             hgx_bmc_gpu_reboot_delay: FirmwareGlobal::hgx_bmc_gpu_reboot_delay_default(),
@@ -184,6 +191,7 @@ impl Default for FirmwareGlobal {
             downloads: FirmwareDownloadConfig::default(),
             host_firmware_upgrade_retry_interval:
                 FirmwareGlobal::host_firmware_upgrade_retry_interval_default(),
+            scout_upgrade_acknowledgement_enabled: false,
             instance_updates_manual_tagging: false,
             no_reset_retries: false,
             hgx_bmc_gpu_reboot_delay: FirmwareGlobal::hgx_bmc_gpu_reboot_delay_default(),

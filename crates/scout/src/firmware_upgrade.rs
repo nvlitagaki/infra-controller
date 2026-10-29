@@ -24,6 +24,75 @@ use crate::metrics::FirmwareDownloadKind;
 
 const SCRIPT_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Retains the completed task and bounded report while the control loop retries it.
+/// This receipt is process-local; it does not survive a Scout restart.
+#[derive(Default)]
+pub(super) struct FirmwareUpgradeState {
+    completed: Option<FirmwareUpgradeReceipt>,
+}
+
+struct FirmwareUpgradeReceipt {
+    task: FirmwareUpgradeTask,
+    result: FirmwareUpgradeResult,
+    acknowledged: bool,
+}
+
+impl FirmwareUpgradeState {
+    pub(super) async fn run(
+        &mut self,
+        client: &reqwest::Client,
+        task: &FirmwareUpgradeTask,
+        requires_acknowledgement: bool,
+        acknowledge: impl std::future::Future<Output = scout::CarbideClientResult<()>>,
+    ) -> scout::CarbideClientResult<&FirmwareUpgradeResult> {
+        if let Some(completed) = &mut self.completed
+            && completed.task.upgrade_task_id == task.upgrade_task_id
+        {
+            if completed.task != *task {
+                return Err(scout::CarbideClientError::GenericError(
+                    "firmware task ID reused with different contents".into(),
+                ));
+            }
+            // A legacy response can omit the requirement during a Core rollout.
+            // Reconcile acceptance before replaying its completion, without reflashing.
+            if requires_acknowledgement && !completed.acknowledged {
+                acknowledge.await?;
+                completed.acknowledged = true;
+            }
+        } else {
+            if requires_acknowledgement {
+                acknowledge.await?;
+            }
+            let result = handle_firmware_upgrade(client, task).await;
+            let result = FirmwareUpgradeResult {
+                stdout: crate::truncate(
+                    &result.stdout,
+                    crate::MAX_FIRMWARE_UPGRADE_STATUS_FIELD_SIZE,
+                ),
+                stderr: crate::truncate(
+                    &result.stderr,
+                    crate::MAX_FIRMWARE_UPGRADE_STATUS_FIELD_SIZE,
+                ),
+                error: crate::truncate(
+                    &result.error,
+                    crate::MAX_FIRMWARE_UPGRADE_STATUS_FIELD_SIZE,
+                ),
+                ..result
+            };
+            self.completed = Some(FirmwareUpgradeReceipt {
+                task: task.clone(),
+                result,
+                acknowledged: requires_acknowledgement,
+            });
+        }
+        Ok(&self
+            .completed
+            .as_ref()
+            .expect("completed task was retained")
+            .result)
+    }
+}
+
 fn firmware_task_text_context(value: &str, task: &FirmwareUpgradeTask) -> String {
     let urls = task.script.iter().map(|script| script.url.as_str()).chain(
         task.file_artifacts
@@ -219,6 +288,87 @@ mod tests {
             url: format!("{base}{path}"),
             sha256: sha256_hex(content),
         }
+    }
+
+    #[tokio::test]
+    async fn acceptance_precedes_execution_and_redelivery_reuses_completion() {
+        let directory = tempfile::tempdir().unwrap();
+        let marker = directory.path().join("executions");
+        let script = format!(
+            "#!/bin/sh\nprintf run >> '{}'\necho complete\nprintf '{}'",
+            marker.display(),
+            "x".repeat(3000)
+        );
+        let body = script.clone();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            axum::serve(
+                listener,
+                Router::new().route(
+                    "/upgrade.sh",
+                    get(move || {
+                        let body = body.clone();
+                        async move { body }
+                    }),
+                ),
+            )
+            .await
+            .unwrap();
+        });
+        let task = FirmwareUpgradeTask {
+            upgrade_task_id: "receipt-task".into(),
+            script: Some(script_artifact(&base, "/upgrade.sh", &script)),
+            execution_timeout_seconds: 5,
+            ..Default::default()
+        };
+        let client = reqwest::Client::new();
+        let mut state = FirmwareUpgradeState::default();
+        let error = state
+            .run(&client, &task, true, async {
+                Err(scout::CarbideClientError::TonicStatusError(
+                    tonic::Status::unavailable("lost acknowledgement response"),
+                ))
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            scout::CarbideClientError::TonicStatusError(_)
+        ));
+        assert!(!marker.exists());
+
+        let result = state
+            .run(&client, &task, true, async { Ok(()) })
+            .await
+            .unwrap();
+        assert!(result.success);
+        assert_eq!(
+            result.stdout.len(),
+            crate::MAX_FIRMWARE_UPGRADE_STATUS_FIELD_SIZE
+        );
+        let reported_stdout = result.stdout.clone();
+        assert_eq!(std::fs::read_to_string(&marker).unwrap(), "run");
+        // Simulate loss of the completion report: Core delivers the same task again.
+        let result = state
+            .run(&client, &task, true, async {
+                panic!("completed task must only replay its result")
+            })
+            .await
+            .unwrap();
+        assert!(result.success);
+        assert_eq!(result.stdout, reported_stdout);
+        assert_eq!(std::fs::read_to_string(&marker).unwrap(), "run");
+
+        let mut changed = task.clone();
+        changed.target_version = "different".into();
+        assert!(
+            state
+                .run(&client, &changed, true, async { Ok(()) })
+                .await
+                .is_err()
+        );
+        assert_eq!(std::fs::read_to_string(&marker).unwrap(), "run");
     }
 
     fn test_runtime() -> tokio::runtime::Runtime {

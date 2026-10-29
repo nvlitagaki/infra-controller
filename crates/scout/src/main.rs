@@ -40,10 +40,7 @@ use rpc::protos::mlx_device::{
     LockStatus, MlxObservation, MlxObservationReport, PublishMlxObservationReportRequest,
     PublishMlxObservationReportResponse,
 };
-use rpc::{
-    ForgeScoutErrorReport, forge as rpc_forge, forge_agent_control_response as fac,
-    scout_firmware_upgrade as sfu,
-};
+use rpc::{ForgeScoutErrorReport, forge as rpc_forge, forge_agent_control_response as fac};
 use scout::{CarbideClientError, CarbideClientResult};
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
@@ -59,6 +56,8 @@ mod deprovision;
 mod discovery;
 mod firmware_staging;
 mod firmware_upgrade;
+#[cfg(test)]
+mod firmware_upgrade_action_tests;
 mod lldp_report;
 mod machine_validation;
 mod metrics;
@@ -290,6 +289,7 @@ async fn run_as_service(config: &Options) -> Result<(), eyre::Report> {
     );
 
     let mut scout_stream_started = false;
+    let mut firmware_upgrade_state = firmware_upgrade::FirmwareUpgradeState::default();
     let outcome: Result<(), eyre::Report> = async {
         loop {
             if is_time_to_check_certs_expiry(next_certs_check_time) {
@@ -318,7 +318,14 @@ async fn run_as_service(config: &Options) -> Result<(), eyre::Report> {
                 let action_name = action.as_str_name();
                 // Capture the action label before handle_action consumes `action`.
                 let scout_action = metrics::ScoutAction::from(&action);
-                let result = handle_action(action, &machine_id, machine_interface_id, config).await;
+                let result = handle_action(
+                    action,
+                    &machine_id,
+                    machine_interface_id,
+                    config,
+                    &mut firmware_upgrade_state,
+                )
+                .await;
                 emit(match result {
                     Ok(()) => metrics::ScoutActionHandled::Ok {
                         action: scout_action,
@@ -447,7 +454,14 @@ async fn run_standalone(config: &Options) -> Result<(), eyre::Report> {
         Command::LldpNeighbors => return Ok(()),
     };
 
-    handle_action(action, &machine_id, machine_interface_id, config).await?;
+    handle_action(
+        action,
+        &machine_id,
+        machine_interface_id,
+        config,
+        &mut firmware_upgrade::FirmwareUpgradeState::default(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -456,6 +470,7 @@ async fn handle_action(
     machine_id: &MachineId,
     machine_interface_id: uuid::Uuid,
     config: &Options,
+    firmware_upgrade_state: &mut firmware_upgrade::FirmwareUpgradeState,
 ) -> Result<(), CarbideClientError> {
     match action {
         fac::Action::Discovery(_) => {
@@ -544,7 +559,13 @@ async fn handle_action(
             return Ok(());
         }
         fac::Action::FirmwareUpgrade(firmware_upgrade) => {
-            handle_firmware_upgrade_action(config, machine_id, firmware_upgrade.task).await?;
+            handle_firmware_upgrade_action(
+                config,
+                machine_id,
+                firmware_upgrade,
+                firmware_upgrade_state,
+            )
+            .await?;
         }
     }
     Ok(())
@@ -553,9 +574,10 @@ async fn handle_action(
 async fn handle_firmware_upgrade_action(
     config: &Options,
     machine_id: &MachineId,
-    task: Option<sfu::ScoutFirmwareUpgradeTask>,
+    action: fac::FirmwareUpgrade,
+    state: &mut firmware_upgrade::FirmwareUpgradeState,
 ) -> Result<(), CarbideClientError> {
-    let task = task.ok_or_else(|| {
+    let task = action.task.ok_or_else(|| {
         CarbideClientError::GenericError("firmware upgrade action missing task".to_string())
     })?;
 
@@ -569,7 +591,25 @@ async fn handle_firmware_upgrade_action(
         "[firmware_upgrade] received upgrade task",
     );
 
-    let result = firmware_upgrade::handle_firmware_upgrade(&http_client, &task).await;
+    let result = state
+        .run(
+            &http_client,
+            &task,
+            action.requires_acknowledgement,
+            async {
+                let mut client = client::create_forge_client(config).await?;
+                client
+                    .acknowledge_scout_firmware_upgrade(
+                        rpc_forge::ScoutFirmwareUpgradeAcknowledgement {
+                            machine_id: Some(machine_id.try_into()?),
+                            upgrade_task_id: task.upgrade_task_id.clone(),
+                        },
+                    )
+                    .await?;
+                Ok(())
+            },
+        )
+        .await?;
 
     tracing::info!(
         success = result.success,
@@ -579,7 +619,7 @@ async fn handle_firmware_upgrade_action(
         "[firmware_upgrade] upgrade finished",
     );
 
-    report_firmware_upgrade_status(config, machine_id, task.upgrade_task_id, &result).await?;
+    report_firmware_upgrade_status(config, machine_id, task.upgrade_task_id, result).await?;
 
     if !result.success {
         return Err(CarbideClientError::GenericError(format!(
@@ -1143,7 +1183,10 @@ async fn report_scout_error(
 fn agent_control_request(machine_id: &MachineId) -> rpc_forge::ForgeAgentControlRequest {
     rpc_forge::ForgeAgentControlRequest {
         machine_id: Some(*machine_id),
-        capabilities: vec![rpc_forge::ForgeAgentControlCapability::NicFirmwareUpdateV1.into()],
+        capabilities: vec![
+            rpc_forge::ForgeAgentControlCapability::NicFirmwareUpdateV1.into(),
+            rpc_forge::ForgeAgentControlCapability::ScoutFirmwareUpgradeAckV1.into(),
+        ],
     }
 }
 
@@ -1345,6 +1388,7 @@ mod tests {
                 machine_id: Some(machine_id),
                 capabilities: vec![
                     rpc_forge::ForgeAgentControlCapability::NicFirmwareUpdateV1.into(),
+                    rpc_forge::ForgeAgentControlCapability::ScoutFirmwareUpgradeAckV1.into(),
                 ],
             }
         );

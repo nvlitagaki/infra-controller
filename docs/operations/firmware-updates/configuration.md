@@ -377,6 +377,7 @@ pre-ingestion manager:
 | `firmware_global.firmware_directory` | `/opt/nico/firmware`, otherwise `/opt/carbide/firmware` | Directory containing legacy metadata and local firmware artifacts. |
 | `firmware_global.firmware_download_cache_directory` | `/mnt/persistence/fw/download-cache` | Writable cache for downloaded firmware artifacts. |
 | `firmware_global.host_firmware_upgrade_retry_interval` | `60m` | Delay before the managed-host state machine retries a failed host firmware upgrade. |
+| `firmware_global.scout_upgrade_acknowledgement_enabled` | `false` | Create Scout tasks with separate delivery and completion deadlines. Requires updated Core replicas and Scouts; changes require a Core restart and affect only new tasks. Follow the [staged rollout](host-firmware.md#installation-route). |
 | `firmware_global.instance_updates_manual_tagging` | See below | When `true`, automatic host selection is limited to unassigned hosts in top-level `Ready`. When `false`, assigned hosts can also receive a pending request. |
 | `firmware_global.no_reset_retries` | `false` | Disables the normal retry handling for BMC reset failures during pre-ingestion and managed-host firmware work. |
 | `firmware_global.hgx_bmc_gpu_reboot_delay` | `30s` | Delay after a GPU reboot before NICo accesses the HGX BMC again. |
