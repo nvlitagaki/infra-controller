@@ -588,6 +588,8 @@ paths:
 
         The profile must exist in the Site configuration. The aliases `external`, `internal`, and `privileged-internal` select the built-in profiles; other configured names are case-sensitive and passed unchanged. The default cannot be cleared. Both request fields are required; omission, null, or an empty value is rejected.
 
+        A privileged Tenant may only select a profile whose access tier is numerically greater than or equal to that of its current default. A lower tier returns 403 before submitting an update. Unset tiers count as zero. The check uses the current Tenant version that also guards the update; a concurrent default change cannot bypass it. This restriction does not apply to the Provider endpoint.
+
         The Tenant must have no active FNN VPCs when changing the profile. Reapplying the same profile is allowed. Existing VPCs are not modified. Tenant metadata is preserved, and a concurrent Tenant change causes a 412 response instead of overwriting newer state. A timeout does not prove the update failed; inspect the Tenant's default before retrying.
       requestBody:
         required: true
@@ -3482,6 +3484,158 @@ paths:
                   labels:
                     region: us-west-1
                     env: dev
+  '/v2/org/{org}/nico/vpc/routing-profile':
+    parameters:
+      - name: org
+        in: path
+        required: true
+        description: Name of the caller organization
+        schema:
+          type: string
+    get:
+      summary: List named VPC routing profiles
+      operationId: get-all-vpc-routing-profile-definition
+      tags:
+        - VPC
+      description: |-
+        List the full configured routing profiles the caller is eligible to see. The `internal` and `minimumAccessTier` filters have AND semantics and match the Core name-query filters. Providers' supplied filters, including omission, false, and zero, are forwarded unchanged.
+
+        A privileged Tenant that supplies a minimum tier numerically below its default profile's tier receives 403 with an explanation. Otherwise the effective minimum is the maximum of the default profile's tier and the supplied minimum. Omission uses the default profile's tier. This minimum is sent to Core before discovering profile names.
+
+        Results use name ordering (`NAME_ASC` by default) and standard pagination. Follow `X-Pagination` to retrieve the complete eligible list. The response is an array of full definitions, including an empty array when no profiles match. If a selected definition disappears or no longer matches the filters between the two Core reads, the response is 409; retry the query.
+
+        Org must have an Infrastructure Provider or Tenant entity. Providers require `PROVIDER_ADMIN` or `PROVIDER_VIEWER` authorization and must own the selected Site. Tenants require `TENANT_ADMIN` authorization and effective TargetedInstanceCreation at that Site; a Site override takes precedence over the Ready Tenant Account's privilege. Other tenants receive 403. The Site must be Registered with native networking enabled.
+
+        Tenant access is bounded by the access tier of their own default routing profile on the selected Site. An unset access tier is treated as zero for authorization. A missing or invalid default definition fails closed. Definitions preserve configured null, false, zero, and empty values; these are base profiles, before VPC overrides or effective defaults.
+      parameters:
+        - name: siteId
+          in: query
+          required: true
+          description: Site whose configured routing profiles are queried
+          schema:
+            type: string
+            format: uuid
+        - name: internal
+          in: query
+          description: True selects internal profiles; false selects external profiles. Omission includes both. An unset configured value is treated as false.
+          schema:
+            type: boolean
+        - name: minimumAccessTier
+          in: query
+          description: Inclusive minimum access tier. Lower numbers confer broader access. An unset configured tier is zero; tenants cannot query below their default tier.
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            maximum: 4294967295
+        - name: pageNumber
+          in: query
+          description: One-indexed page number
+          schema:
+            $ref: '#/components/schemas/PageNumber'
+            default: 1
+        - name: pageSize
+          in: query
+          description: Number of profiles per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: orderBy
+          in: query
+          description: Sort profiles by their exact configured name before pagination
+          schema:
+            type: string
+            enum:
+              - NAME_ASC
+              - NAME_DESC
+            default: NAME_ASC
+      responses:
+        '200':
+          description: Full configured routing profile definitions
+          headers:
+            X-Pagination:
+              description: JSON pagination metadata including pageNumber, pageSize, total, and orderBy
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VpcRoutingProfileDefinition'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/GenericHttpError'
+        '500':
+          $ref: '#/components/responses/GenericHttpError'
+        '501':
+          $ref: '#/components/responses/GenericHttpError'
+        '503':
+          $ref: '#/components/responses/GenericHttpError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeoutError'
+  '/v2/org/{org}/nico/vpc/routing-profile/{profileName}':
+    parameters:
+      - name: org
+        in: path
+        required: true
+        description: Name of the caller organization
+        schema:
+          type: string
+      - name: profileName
+        in: path
+        required: true
+        description: Exact, case-sensitive configured profile name. URL-encode reserved characters; built-in aliases are not normalized by this GET endpoint.
+        schema:
+          type: string
+          minLength: 1
+    get:
+      summary: Retrieve a named VPC routing profile
+      operationId: get-vpc-routing-profile-definition
+      tags:
+        - VPC
+      description: |-
+        Retrieve a full configured routing profile by its exact name. A privileged Tenant may read it only if its access tier is numerically greater than or equal to the tier of the Tenant's default; otherwise the response is 403. A name absent from the Site returns 404.
+
+        Org must have an Infrastructure Provider or Tenant entity. Providers require `PROVIDER_ADMIN` or `PROVIDER_VIEWER` authorization and must own the selected Site. Tenants require `TENANT_ADMIN` authorization and effective TargetedInstanceCreation at that Site; a Site override takes precedence over the Ready Tenant Account's privilege. Other tenants receive 403. The Site must be Registered with native networking enabled.
+
+        Tenant access is bounded by the access tier of their own default routing profile on the selected Site. An unset access tier is treated as zero for authorization. A missing or invalid default definition fails closed. Definitions preserve configured null, false, zero, and empty values; these are base profiles, before VPC overrides or effective defaults.
+      parameters:
+        - name: siteId
+          in: query
+          required: true
+          description: Site whose configured routing profiles are queried
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Full configured routing profile definitions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VpcRoutingProfileDefinition'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/GenericHttpError'
+        '501':
+          $ref: '#/components/responses/GenericHttpError'
+        '503':
+          $ref: '#/components/responses/GenericHttpError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeoutError'
   '/v2/org/{org}/nico/vpc/{vpcId}/routing-profile':
     parameters:
       - schema:
@@ -22347,6 +22501,46 @@ components:
         labels:
           $ref: '#/components/schemas/Labels'
           description: 'Update labels of the VPC. Up to 10 key-value pairs can be specified. The labels will be replaced with the labels sent in the request. Any labels not included in the request will be removed. To retain existing labels, fetch them first and include them in this request.'
+    VpcRoutingProfileDefinition:
+      title: VpcRoutingProfileDefinition
+      type: object
+      description: Full named base definition from the selected Site, before VPC overrides or effective defaults.
+      required:
+        - name
+        - config
+      properties:
+        name:
+          type: string
+          description: Exact configured profile name, without alias normalization.
+        config:
+          $ref: '#/components/schemas/VpcRoutingProfileDefinitionConfig'
+    VpcRoutingProfileDefinitionConfig:
+      title: VpcRoutingProfileDefinitionConfig
+      description: Configured properties of a named profile. Null means unset; explicit false, zero, and empty arrays are preserved.
+      allOf:
+        - $ref: '#/components/schemas/VpcRoutingProfileOverrides'
+        - type: object
+          required:
+            - internal
+            - accessTier
+            - tenantPrefixOverlapEligible
+          properties:
+            internal:
+              type:
+                - boolean
+                - 'null'
+              description: Whether this is an internal profile. Null is treated as false for filtering.
+            accessTier:
+              type:
+                - integer
+                - 'null'
+              format: int64
+              minimum: 0
+              maximum: 4294967295
+              description: Lower numbers permit broader access. Null is treated as zero for filtering and authorization.
+            tenantPrefixOverlapEligible:
+              type: boolean
+              description: Profile opt-in to tenant prefix reuse; this alone does not establish eligibility.
     VpcRoutingProfileUpdateRequest:
       title: VpcRoutingProfileUpdateRequest
       type: object

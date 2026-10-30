@@ -43,7 +43,7 @@ func TestNewAPIRoutes(t *testing.T) {
 		"tenant":                    7,
 		"tenant-account":            5,
 		"site":                      6,
-		"vpc":                       9,
+		"vpc":                       11,
 		"vpcpeering":                4,
 		"vpcprefix":                 5,
 		"ip-block":                  6,
@@ -192,7 +192,12 @@ func TestNewAPIRoutes(t *testing.T) {
 			for _, route := range got {
 				assert.NotEqual(t, tenantPath+"/account/:id/routing-profile", route.Path)
 			}
+			profileDefinitionsPath := "/org/:orgName/" + cfg.GetAPIName() + "/vpc/routing-profile"
+			assertRouteExists(t, got, http.MethodGet, profileDefinitionsPath)
+			assertRouteExists(t, got, http.MethodGet, profileDefinitionsPath+"/:profileName")
+			assertRouteBefore(t, got, http.MethodGet, profileDefinitionsPath, http.MethodGet, "/org/:orgName/"+cfg.GetAPIName()+"/vpc/:id")
 			vpcRoutingProfilePath := "/org/:orgName/" + cfg.GetAPIName() + "/vpc/:id/routing-profile"
+			assertRouteBefore(t, got, http.MethodGet, profileDefinitionsPath+"/:profileName", http.MethodGet, vpcRoutingProfilePath)
 			assertRouteExists(t, got, http.MethodGet, vpcRoutingProfilePath)
 			assertRouteExists(t, got, http.MethodPatch, vpcRoutingProfilePath)
 			assertRouteExists(t, got, http.MethodPost, vpcRoutingProfilePath+"/release-inactive-vni")
