@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
@@ -378,7 +379,7 @@ func (h GetVPCRoutingProfileDefinitionHandler) Handle(c echo.Context) error {
 	} else {
 		// Echo retains escaped path parameters. Decode once, preserving '+' and case.
 		profileName, err = url.PathUnescape(profileName)
-		if err != nil {
+		if err != nil || !utf8.ValidString(profileName) {
 			return cutil.NewAPIErrorResponse(c, http.StatusBadRequest, "Invalid routing profile name", nil)
 		}
 	}

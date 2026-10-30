@@ -1098,6 +1098,14 @@ func TestGetVPCRoutingProfileDefinitionHandler_Handle(t *testing.T) {
 			},
 		},
 		{
+			name:   "invalid UTF-8 profile name is a client error",
+			detail: true,
+			status: http.StatusBadRequest,
+			prepare: func(t *testing.T, f *profileQueryFixture) {
+				f.profileName = string([]byte{0xff})
+			},
+		},
+		{
 			name:   "missing named profile",
 			tenant: false,
 			detail: true,
