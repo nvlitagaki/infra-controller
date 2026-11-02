@@ -29,6 +29,16 @@ type TenantPrivilegeScope struct {
 	SiteID                   *uuid.UUID
 }
 
+// TenantCapabilityDenialReason identifies an unmet capability prerequisite.
+type TenantCapabilityDenialReason string
+
+const (
+	// TenantCapabilityReadyAccountRequired covers missing and non-Ready accounts.
+	TenantCapabilityReadyAccountRequired TenantCapabilityDenialReason = "ReadyTenantAccountRequired"
+	// TenantCapabilityDisabled means the effective capability is disabled.
+	TenantCapabilityDisabled TenantCapabilityDenialReason = "CapabilityDisabled"
+)
+
 // TenantHasTargetedInstanceCreation reports whether the Tenant has the
 // TargetedInstanceCreation capability enabled within the given scope. It is
 // nil-safe so callers don't have to repeat the tenant nil check, and it
@@ -37,27 +47,42 @@ type TenantPrivilegeScope struct {
 // TenantAccount.config with per-site TenantSite.config overrides. See
 // TenantPrivilegeScope for how scope selects the resolution strategy.
 func TenantHasTargetedInstanceCreation(ctx context.Context, tx *db.Tx, dbSession *db.Session, tenant *Tenant, scope *TenantPrivilegeScope) (bool, error) {
+	enabled, _, err := ResolveTenantTargetedInstanceCreation(ctx, tx, dbSession, tenant, scope)
+	return enabled, err
+}
+
+// ResolveTenantTargetedInstanceCreation also reports why the capability is denied.
+// The reason is empty on success or lookup errors. Callers must establish Tenant
+// ownership and scope access before exposing the reason to an API client.
+func ResolveTenantTargetedInstanceCreation(ctx context.Context, tx *db.Tx, dbSession *db.Session, tenant *Tenant, scope *TenantPrivilegeScope) (bool, TenantCapabilityDenialReason, error) {
 	if tenant == nil {
-		return false, nil
+		return false, TenantCapabilityReadyAccountRequired, nil
 	}
 
 	if scope == nil {
-		return false, errors.New("scope must be specified when evaluating Tenant's targeted Instance creation capability")
+		return false, "", errors.New("scope must be specified when evaluating Tenant's targeted Instance creation capability")
 	}
 
 	if scope.SiteID != nil && scope.InfrastructureProviderID != nil {
-		return false, errors.New("site ID and infrastructure provider ID cannot be specified together when evaluating Tenant's targeted Instance creation capability")
+		return false, "", errors.New("site ID and infrastructure provider ID cannot be specified together when evaluating Tenant's targeted Instance creation capability")
 	}
 
 	ta, siteConfig, err := readyTenantAccountForScope(ctx, tx, dbSession, tenant.ID, scope)
-	if err != nil || ta == nil {
-		return false, err
+	if err != nil {
+		return false, "", err
 	}
+	if ta == nil {
+		return false, TenantCapabilityReadyAccountRequired, nil
+	}
+	enabled := ta.Config.TargetedInstanceCreation
 	if siteConfig != nil && siteConfig.TargetedInstanceCreation != nil {
-		return *siteConfig.TargetedInstanceCreation, nil
+		enabled = *siteConfig.TargetedInstanceCreation
+	}
+	if !enabled {
+		return false, TenantCapabilityDisabled, nil
 	}
 
-	return ta.Config.TargetedInstanceCreation, nil
+	return true, "", nil
 }
 
 // TenantHasCrossTenantInterfaceCreation reports whether the Tenant may create or

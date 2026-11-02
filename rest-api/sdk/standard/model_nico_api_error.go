@@ -28,6 +28,10 @@ type NICoAPIError struct {
 	Message *string `json:"message,omitempty"`
 	// Additional data about the error
 	Data map[string]interface{} `json:"data,omitempty"`
+	// Machine-readable capability denial reason. VPC creation with an explicit `routingProfile` uses `ReadyTenantAccountRequired` when the caller's Tenant has no Ready account for the Site's Provider, or `CapabilityDisabled` when the effective capability is disabled after the Site override. Omitted on other errors.
+	Reason *string `json:"reason,omitempty"`
+	// Capability required by the denied operation. VPC creation routing-profile denials use `targetedInstanceCreation`. Omitted on other errors.
+	RequiredCapability *string `json:"requiredCapability,omitempty"`
 	// True permits bounded retries with backoff, without guaranteeing success. False prohibits automatic retries. Omission means unclassified.
 	Retryable *bool `json:"retryable,omitempty"`
 }
@@ -145,6 +149,70 @@ func (o *NICoAPIError) SetData(v map[string]interface{}) {
 	o.Data = v
 }
 
+// GetReason returns the Reason field value if set, zero value otherwise.
+func (o *NICoAPIError) GetReason() string {
+	if o == nil || IsNil(o.Reason) {
+		var ret string
+		return ret
+	}
+	return *o.Reason
+}
+
+// GetReasonOk returns a tuple with the Reason field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *NICoAPIError) GetReasonOk() (*string, bool) {
+	if o == nil || IsNil(o.Reason) {
+		return nil, false
+	}
+	return o.Reason, true
+}
+
+// HasReason returns a boolean if a field has been set.
+func (o *NICoAPIError) HasReason() bool {
+	if o != nil && !IsNil(o.Reason) {
+		return true
+	}
+
+	return false
+}
+
+// SetReason gets a reference to the given string and assigns it to the Reason field.
+func (o *NICoAPIError) SetReason(v string) {
+	o.Reason = &v
+}
+
+// GetRequiredCapability returns the RequiredCapability field value if set, zero value otherwise.
+func (o *NICoAPIError) GetRequiredCapability() string {
+	if o == nil || IsNil(o.RequiredCapability) {
+		var ret string
+		return ret
+	}
+	return *o.RequiredCapability
+}
+
+// GetRequiredCapabilityOk returns a tuple with the RequiredCapability field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *NICoAPIError) GetRequiredCapabilityOk() (*string, bool) {
+	if o == nil || IsNil(o.RequiredCapability) {
+		return nil, false
+	}
+	return o.RequiredCapability, true
+}
+
+// HasRequiredCapability returns a boolean if a field has been set.
+func (o *NICoAPIError) HasRequiredCapability() bool {
+	if o != nil && !IsNil(o.RequiredCapability) {
+		return true
+	}
+
+	return false
+}
+
+// SetRequiredCapability gets a reference to the given string and assigns it to the RequiredCapability field.
+func (o *NICoAPIError) SetRequiredCapability(v string) {
+	o.RequiredCapability = &v
+}
+
 // GetRetryable returns the Retryable field value if set, zero value otherwise.
 func (o *NICoAPIError) GetRetryable() bool {
 	if o == nil || IsNil(o.Retryable) {
@@ -195,6 +263,12 @@ func (o NICoAPIError) ToMap() (map[string]interface{}, error) {
 	}
 	if o.Data != nil {
 		toSerialize["data"] = o.Data
+	}
+	if !IsNil(o.Reason) {
+		toSerialize["reason"] = o.Reason
+	}
+	if !IsNil(o.RequiredCapability) {
+		toSerialize["requiredCapability"] = o.RequiredCapability
 	}
 	if !IsNil(o.Retryable) {
 		toSerialize["retryable"] = o.Retryable

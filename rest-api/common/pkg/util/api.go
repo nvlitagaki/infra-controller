@@ -45,7 +45,10 @@ type APIError struct {
 	Data    error  `json:"data"`
 	// Omit unclassified recovery metadata to preserve existing error bodies.
 	Retryable *bool `json:"retryable,omitempty"`
-	cause     error
+	// Omit authorization diagnostics on errors that do not classify a capability denial.
+	Reason             string `json:"reason,omitempty"`
+	RequiredCapability string `json:"requiredCapability,omitempty"`
+	cause              error
 }
 
 // Error implements the error interface so *APIError can flow through error

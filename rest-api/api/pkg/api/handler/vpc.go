@@ -251,14 +251,18 @@ func (cvh CreateVPCHandler) Handle(c echo.Context) error {
 	// separate from effective-profile response visibility.
 	tenantCanSetRoutingProfile := false
 	tenantCanViewEffectiveRoutingProfile := false
+	var routingProfileDenialReason cdbm.TenantCapabilityDenialReason
 	if cdbm.VpcTypeSupportsRoutingProfile(networkVirtualizationType) || apiRequest.RoutingProfile != nil {
-		tenantHasTargetedInstanceCreation, err := common.TenantHasTargetedInstanceCreation(ctx, nil, cvh.dbSession, tenant, &common.TenantPrivilegeScope{SiteID: &site.ID})
+		tenantHasTargetedInstanceCreation, denialReason, err := cdbm.ResolveTenantTargetedInstanceCreation(ctx, nil, cvh.dbSession, tenant, &cdbm.TenantPrivilegeScope{
+			SiteID: &site.ID,
+		})
 		if err != nil {
 			logger.Error().Err(err).Msg("error resolving TargetedInstanceCreation for Tenant/Site")
 			return cutil.NewAPIErrorResponse(c, http.StatusInternalServerError, "Failed to verify privileges for Site", nil)
 		}
 		tenantCanSetRoutingProfile = tenantHasTargetedInstanceCreation
 		tenantCanViewEffectiveRoutingProfile = tenantHasTargetedInstanceCreation
+		routingProfileDenialReason = denialReason
 	}
 
 	if apiRequest.RoutingProfileOverrides != nil && !cdbm.VpcTypeSupportsRoutingProfile(networkVirtualizationType) {
@@ -275,8 +279,17 @@ func (cvh CreateVPCHandler) Handle(c echo.Context) error {
 	if apiRequest.RoutingProfile != nil {
 		// Routing-profile writes require TargetedInstanceCreation for the VPC's Site.
 		if !tenantCanSetRoutingProfile {
-			logger.Warn().Msg("tenant does not have sufficient privileges to set `routingProfile`")
-			return cutil.NewAPIErrorResponse(c, http.StatusForbidden, "Tenant does not have sufficient privileges to set `routingProfile`", nil)
+			message := "Tenant does not have sufficient privileges to set `routingProfile`: effective `targetedInstanceCreation` is disabled; review the Tenant Account default and Site override"
+			if routingProfileDenialReason == cdbm.TenantCapabilityReadyAccountRequired {
+				message = "Tenant does not have sufficient privileges to set `routingProfile`: `targetedInstanceCreation` requires a Ready Tenant Account for the Site's Infrastructure Provider; establish or accept the Tenant Account"
+			}
+			apiErr := cutil.NewAPIError(http.StatusForbidden, message, nil)
+			apiErr.Reason = string(routingProfileDenialReason)
+			apiErr.RequiredCapability = common.TenantCapabilityTargetedInstanceCreation
+			logger.Warn().Str("reason", apiErr.Reason).
+				Str("requiredCapability", apiErr.RequiredCapability).
+				Str("tenantId", tenant.ID.String()).Str("siteId", site.ID.String()).Msg(message)
+			return apiErr.Send(c)
 		}
 
 		// The request-struct-only case (both RoutingProfile and

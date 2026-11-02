@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/extra/bundebug"
 	"go.temporal.io/api/enums/v1"
 	temporalClient "go.temporal.io/sdk/client"
@@ -50,6 +51,25 @@ type vpcPowerProvisionerStub struct {
 	dpsclient.PowerProvisioner
 	addedMachineIDs []string
 }
+
+// Fail only the capability lookup, after the handler has checked Site access.
+type vpcTenantAccountLookupFailureHook struct {
+	armed bool
+	fired bool
+}
+
+func (h *vpcTenantAccountLookupFailureHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if !h.armed || !strings.HasPrefix(event.Query, "SELECT ") || !strings.Contains(event.Query, `FROM "tenant_account"`) {
+		return ctx
+	}
+	h.armed = false
+	h.fired = true
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	return canceled
+}
+
+func (*vpcTenantAccountLookupFailureHook) AfterQuery(context.Context, *bun.QueryEvent) {}
 
 func (s *vpcPowerProvisionerStub) CreateResourceGroup(context.Context, string, int64) error {
 	return nil
@@ -1056,29 +1076,6 @@ func TestCreateVPCHandler_Handle(t *testing.T) {
 			verifyChildSpanner: true,
 		},
 		{
-			name: "test VPC create API endpoint rejects routing profile for tenant without targeted instance creation",
-			fields: fields{
-				dbSession: dbSession,
-				tc:        tc,
-				cfg:       cfg,
-			},
-			args: args{
-				reqData: &model.APIVpcCreateRequest{
-					Name:                      "Test VPC restricted routing profile",
-					Description:               cutil.GetPtr("Test VPC Description"),
-					SiteID:                    st1.ID.String(),
-					NetworkVirtualizationType: cutil.GetPtr(cdbm.VpcFNN),
-					RoutingProfile:            cutil.GetPtr(model.APIVpcRoutingProfileInternal),
-				},
-				reqOrg:      tnOrg3,
-				reqUser:     tnu3,
-				respCode:    http.StatusForbidden,
-				respMessage: "Tenant does not have sufficient privileges to set `routingProfile`",
-			},
-			wantErr:            false,
-			verifyChildSpanner: true,
-		},
-		{
 			name: "test VPC create API endpoint rejects routing profile for ethernet virtualization",
 			fields: fields{
 				dbSession: dbSession,
@@ -1779,6 +1776,183 @@ func TestCreateVPCHandler_Handle(t *testing.T) {
 			}
 		})
 	}
+	t.Run("routing profile authorization", func(t *testing.T) {
+		lookupFailure := &vpcTenantAccountLookupFailureHook{}
+		dbSession.DB.AddQueryHook(lookupFailure)
+		cases := []struct {
+			name           string
+			accountStatus  string
+			accountEnabled bool
+			siteOverride   *bool
+			otherProvider  bool
+			noSiteAccess   bool
+			foreignOrg     bool
+			lookupError    bool
+			status         int
+			reason         string
+			message        string
+		}{
+			{
+				name:    "missing Ready account despite another Tenant's enabled account",
+				status:  http.StatusForbidden,
+				reason:  "ReadyTenantAccountRequired",
+				message: "Tenant does not have sufficient privileges to set `routingProfile`: `targetedInstanceCreation` requires a Ready Tenant Account for the Site's Infrastructure Provider; establish or accept the Tenant Account",
+			},
+			{
+				name:           "non-Ready account cannot be bypassed by Site override",
+				accountStatus:  cdbm.TenantAccountStatusPending,
+				accountEnabled: true,
+				siteOverride:   cutil.GetPtr(true),
+				status:         http.StatusForbidden,
+				reason:         "ReadyTenantAccountRequired",
+				message:        "Tenant does not have sufficient privileges to set `routingProfile`: `targetedInstanceCreation` requires a Ready Tenant Account for the Site's Infrastructure Provider; establish or accept the Tenant Account",
+			},
+			{
+				name:           "Ready account at another Provider cannot authorize this Site",
+				accountStatus:  cdbm.TenantAccountStatusReady,
+				accountEnabled: true,
+				otherProvider:  true,
+				siteOverride:   cutil.GetPtr(true),
+				status:         http.StatusForbidden,
+				reason:         "ReadyTenantAccountRequired",
+				message:        "Tenant does not have sufficient privileges to set `routingProfile`: `targetedInstanceCreation` requires a Ready Tenant Account for the Site's Infrastructure Provider; establish or accept the Tenant Account",
+			},
+			{
+				name:          "Ready account capability disabled",
+				accountStatus: cdbm.TenantAccountStatusReady,
+				status:        http.StatusForbidden,
+				reason:        "CapabilityDisabled",
+				message:       "Tenant does not have sufficient privileges to set `routingProfile`: effective `targetedInstanceCreation` is disabled; review the Tenant Account default and Site override",
+			},
+			{
+				name:           "Site override disables account default",
+				accountStatus:  cdbm.TenantAccountStatusReady,
+				accountEnabled: true,
+				siteOverride:   cutil.GetPtr(false),
+				status:         http.StatusForbidden,
+				reason:         "CapabilityDisabled",
+				message:        "Tenant does not have sufficient privileges to set `routingProfile`: effective `targetedInstanceCreation` is disabled; review the Tenant Account default and Site override",
+			},
+			{
+				name:          "Site override enables disabled account default",
+				accountStatus: cdbm.TenantAccountStatusReady,
+				siteOverride:  cutil.GetPtr(true),
+				status:        http.StatusCreated,
+			},
+			{
+				name:         "Site access required before diagnostics",
+				noSiteAccess: true,
+				status:       http.StatusForbidden,
+				message:      "Tenant does not have access to Site specified in request data",
+			},
+			{
+				name:       "another org cannot inspect Tenant policy",
+				foreignOrg: true,
+				status:     http.StatusForbidden,
+				message:    "Failed to validate membership for org: " + tnOrg,
+			},
+			{
+				name:          "account lookup failure remains an internal error",
+				accountStatus: cdbm.TenantAccountStatusReady,
+				lookupError:   true,
+				status:        http.StatusInternalServerError,
+				message:       "Failed to verify privileges for Site",
+			},
+		}
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				org := "routing-profile-" + uuid.NewString()
+				user := testVPCBuildUser(t, dbSession, uuid.NewString(), org, tnOrgRoles)
+				tenant := testVPCBuildTenant(t, dbSession, org, org, user)
+				tenantSite := cdbm.TestBuildTenantSite(t, dbSession, tenant, st1, &cdbm.TenantSiteConfig{
+					TargetedInstanceCreation: tt.siteOverride,
+				}, user)
+				if !tt.noSiteAccess {
+					testVPCSiteBuildAllocation(t, dbSession, st1, tenant, org, ipu)
+				}
+				if tt.accountStatus != "" {
+					provider := ip
+					if tt.otherProvider {
+						provider = testVPCSiteBuildInfrastructureProvider(t, dbSession, org, org, ipu)
+					}
+					common.TestBuildTenantAccountWithCapabilities(t, dbSession, provider, &tenant.ID, org, tt.accountStatus, user, cdbm.TenantAccountConfig{
+						TargetedInstanceCreation: tt.accountEnabled,
+					})
+				}
+				accountFilter := cdbm.TenantAccountFilterInput{
+					TenantIDs: []uuid.UUID{tenant.ID},
+				}
+				accountsBefore, _, err := cdbm.NewTenantAccountDAO(dbSession).GetAll(ctx, nil, accountFilter, paginator.PageInput{}, nil)
+				require.NoError(t, err)
+
+				request := model.APIVpcCreateRequest{
+					Name:                      org,
+					SiteID:                    st1.ID.String(),
+					NetworkVirtualizationType: cutil.GetPtr(cdbm.VpcFNN),
+					RoutingProfile:            cutil.GetPtr("internal"),
+				}
+				body, err := json.Marshal(request)
+				require.NoError(t, err)
+				req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(body)))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				rec := httptest.NewRecorder()
+				ec := e.NewContext(req, rec)
+				ec.SetParamNames("orgName")
+				ec.SetParamValues(org)
+				if tt.foreignOrg {
+					ec.SetParamValues(tnOrg)
+				}
+				ec.Set("user", user)
+				handler := CreateVPCHandler{
+					dbSession: dbSession,
+					tc:        tc,
+					scp:       scp,
+					cfg:       cfg,
+				}
+				tsc.Calls = nil
+				lookupFailure.armed = tt.lookupError
+				lookupFailure.fired = false
+				err = handler.Handle(ec)
+				require.NoError(t, err)
+				lookupFailure.armed = false
+				assert.Equal(t, tt.lookupError, lookupFailure.fired)
+				require.Equal(t, tt.status, rec.Code, rec.Body.String())
+
+				var response map[string]json.RawMessage
+				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+				if tt.reason == "" {
+					assert.NotContains(t, response, "reason")
+					assert.NotContains(t, response, "requiredCapability")
+				} else {
+					assert.JSONEq(t, fmt.Sprintf("%q", tt.reason), string(response["reason"]))
+					assert.JSONEq(t, `"targetedInstanceCreation"`, string(response["requiredCapability"]))
+				}
+				vpcs, total, err := cdbm.NewVpcDAO(dbSession).GetAll(ctx, nil, cdbm.VpcFilterInput{
+					Name: &request.Name,
+				}, paginator.PageInput{}, nil)
+				require.NoError(t, err)
+				if tt.status == http.StatusCreated {
+					require.Equal(t, 1, total)
+					require.Len(t, vpcs, 1)
+					assert.Equal(t, cutil.GetPtr("INTERNAL"), vpcs[0].RoutingProfile)
+					assert.Equal(t, tenant.ID, vpcs[0].TenantID)
+					assert.JSONEq(t, `"internal"`, string(response["routingProfile"]))
+				} else {
+					assert.JSONEq(t, fmt.Sprintf("%q", tt.message), string(response["message"]))
+					assert.JSONEq(t, "null", string(response["data"]))
+					assert.Zero(t, total)
+					assert.Empty(t, vpcs)
+					assert.Empty(t, tsc.Calls, "denial must precede workflow dispatch")
+				}
+				accountsAfter, _, err := cdbm.NewTenantAccountDAO(dbSession).GetAll(ctx, nil, accountFilter, paginator.PageInput{}, nil)
+				require.NoError(t, err)
+				assert.Equal(t, accountsBefore, accountsAfter, "request must not alter Tenant Accounts")
+				tenantSiteAfter, err := cdbm.NewTenantSiteDAO(dbSession).GetByID(ctx, nil, tenantSite.ID, nil)
+				require.NoError(t, err)
+				assert.Equal(t, tenantSite, tenantSiteAfter, "request must not alter Site overrides")
+			})
+		}
+	})
 }
 
 func TestUpdateVPCHandler_Handle(t *testing.T) {

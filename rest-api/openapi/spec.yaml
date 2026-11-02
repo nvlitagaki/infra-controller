@@ -3083,7 +3083,31 @@ paths:
         '400':
           $ref: '#/components/responses/ValidationError'
         '403':
-          $ref: '#/components/responses/ForbiddenError'
+          description: |-
+            The caller lacks permission. A denial at the explicit `routingProfile` capability check, after org, Tenant role, Site access, and preceding request checks pass, includes `requiredCapability: targetedInstanceCreation` and a `reason`:
+              - `ReadyTenantAccountRequired`: no Ready Tenant Account exists for the caller's Tenant and the Site's Infrastructure Provider. Missing and non-Ready accounts share this reason; establish or accept the account.
+              - `CapabilityDisabled`: a Ready account exists, but effective `targetedInstanceCreation` is disabled after applying the Tenant's Site override. Review the account default and Site override.
+
+            Other authorization failures omit these diagnostics. Capability lookup failures return 500. A denied request does not persist a VPC, dispatch its create workflow, or change Tenant Accounts or capability settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NICoAPIError'
+              examples:
+                ready-account-required:
+                  value:
+                    source: nico
+                    message: 'Tenant does not have sufficient privileges to set `routingProfile`: `targetedInstanceCreation` requires a Ready Tenant Account for the Site''s Infrastructure Provider; establish or accept the Tenant Account'
+                    data: null
+                    reason: ReadyTenantAccountRequired
+                    requiredCapability: targetedInstanceCreation
+                capability-disabled:
+                  value:
+                    source: nico
+                    message: 'Tenant does not have sufficient privileges to set `routingProfile`: effective `targetedInstanceCreation` is disabled; review the Tenant Account default and Site override'
+                    data: null
+                    reason: CapabilityDisabled
+                    requiredCapability: targetedInstanceCreation
         '409':
           description: A VPC with the requested `id` or `name` already exists, or the requested DPS power resource-group name is already in use. This can also occur when inventory reconciliation completes before an ambiguous create is retried. Existing DPS groups are not reused, and their ownership is not disclosed.
           content:
@@ -35178,6 +35202,13 @@ components:
             - object
             - 'null'
           description: Additional data about the error
+        reason:
+          type: string
+          description: |-
+            Machine-readable capability denial reason. VPC creation with an explicit `routingProfile` uses `ReadyTenantAccountRequired` when the caller's Tenant has no Ready account for the Site's Provider, or `CapabilityDisabled` when the effective capability is disabled after the Site override. Omitted on other errors.
+        requiredCapability:
+          type: string
+          description: Capability required by the denied operation. VPC creation routing-profile denials use `targetedInstanceCreation`. Omitted on other errors.
         retryable:
           type: boolean
           description: |-
