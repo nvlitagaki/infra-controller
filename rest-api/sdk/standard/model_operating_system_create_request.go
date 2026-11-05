@@ -25,7 +25,7 @@ var _ MappedNullable = &OperatingSystemCreateRequest{}
 // OperatingSystemCreateRequest Request data to create an OperatingSystem
 type OperatingSystemCreateRequest struct {
 	// Name of the Operating System
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Optional description of the Operating System
 	Description NullableString `json:"description,omitempty"`
 	// Deprecated: Infrastructure Provider is now inferred from org membership.

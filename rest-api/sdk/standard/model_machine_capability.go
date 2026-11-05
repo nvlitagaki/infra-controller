@@ -25,7 +25,7 @@ type MachineCapability struct {
 	// Type of the Capability
 	Type *string `json:"type,omitempty"`
 	// Name of the Capability component
-	Name *string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Frequency of the Capability component, if available
 	Frequency NullableString `json:"frequency,omitempty"`
 	// Number of Cores in the Capability component, if applicable

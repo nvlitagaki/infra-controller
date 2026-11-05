@@ -137,11 +137,11 @@ func (req APIMachineValidationTestCreateRequest) Validate() error {
 			validation.Length(2, 64).Error(validationErrorStringLength64)),
 		validation.Field(&req.Command,
 			validation.Required.Error(validationErrorStringLength),
-			validation.By(util.ValidateNameCharacters),
+			validation.By(util.ValidateNameWhitespace),
 			validation.Length(2, 256).Error(validationErrorStringLength)),
 		validation.Field(&req.Args,
 			validation.Required.Error(validationErrorValueRequired),
-			validation.By(util.ValidateNameCharacters)),
+			validation.By(util.ValidateNameWhitespace)),
 	)
 	if err != nil {
 		return err

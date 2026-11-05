@@ -25,7 +25,7 @@ var _ MappedNullable = &SpectrumXPartitionCreateRequest{}
 // SpectrumXPartitionCreateRequest Request data to create a SpectrumX Partition
 type SpectrumXPartitionCreateRequest struct {
 	// Name of the Partition to create
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Optional description of the Partition
 	Description NullableString `json:"description,omitempty"`
 	// ID of the Site the Partition should belong to

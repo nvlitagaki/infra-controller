@@ -203,7 +203,7 @@ func TestCreateSpectrumXPartitionHandler_Handle(t *testing.T) {
 			Name:        "east-west-net",
 			Description: cutil.GetPtr("east-west"),
 			SiteID:      fx.site.ID.String(),
-			Labels:      map[string]string{"env": "prod"},
+			Labels:      map[string]string{"env": "東京"},
 		}, fx.user, fx.org)
 		require.Equal(t, http.StatusCreated, rec.Code)
 
@@ -223,12 +223,14 @@ func TestCreateSpectrumXPartitionHandler_Handle(t *testing.T) {
 		assert.Equal(t, fx.org, coreReq.GetTenantOrganizationId())
 		assert.Equal(t, resp.ID, coreReq.GetId().GetValue())
 		assert.Equal(t, "east-west-net", coreReq.GetMetadata().GetName())
+		assert.Equal(t, "東京", coreReq.GetMetadata().GetLabels()[0].GetValue())
 
 		// The row is persisted with the Site-allocated VNI, not just echoed in the response.
 		persisted, err := cdbm.NewSpectrumXPartitionDAO(fx.dbSession).Get(context.Background(), nil, uuid.MustParse(resp.ID), nil)
 		require.NoError(t, err)
 		require.NotNil(t, persisted.VNI)
 		assert.Equal(t, 10200, *persisted.VNI)
+		assert.Equal(t, "東京", persisted.Labels["env"])
 	})
 
 	t.Run("a requested VNI is carried to Core", func(t *testing.T) {
@@ -385,6 +387,42 @@ func TestCreateSpectrumXPartitionHandler_Handle(t *testing.T) {
 		}, fx.user, fx.org)
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
+
+	for _, tc := range []struct {
+		name          string
+		partitionName string
+		labels        map[string]string
+		message       string
+	}{
+		{
+			name:          "non-ASCII name",
+			partitionName: "réseau",
+			message:       "name field must contain ASCII characters only",
+		},
+		{
+			name:          "non-ASCII label key",
+			partitionName: "east-west-net",
+			labels:        map[string]string{"région": "east"},
+			message:       "label keys must contain ASCII characters only",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fx := newSpectrumXPartitionFixture(t)
+			rec := fx.create(t, model.APISpectrumXPartitionCreateRequest{
+				Name:   tc.partitionName,
+				SiteID: fx.site.ID.String(),
+				Labels: tc.labels,
+			}, fx.user, fx.org)
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			assert.Contains(t, rec.Body.String(), tc.message)
+			fx.coreClient.AssertNotCalled(t, "ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			_, total, err := cdbm.NewSpectrumXPartitionDAO(fx.dbSession).GetAll(context.Background(), nil, cdbm.SpectrumXPartitionFilterInput{
+				Names: []string{tc.partitionName},
+			}, paginator.PageInput{Limit: cutil.GetPtr(paginator.TotalLimit)}, nil)
+			require.NoError(t, err)
+			assert.Zero(t, total)
+		})
+	}
 
 	t.Run("rejects a request that fails validation", func(t *testing.T) {
 		fx := newSpectrumXPartitionFixture(t)

@@ -25,7 +25,7 @@ var _ MappedNullable = &DpuExtensionServiceCreateRequest{}
 // DpuExtensionServiceCreateRequest Request data to create a new DPU Extension Service
 type DpuExtensionServiceCreateRequest struct {
 	// Name for the DPU Extension Service. Must be unique for a given Tenant
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Optional description for the DPU Extension Service
 	Description NullableString `json:"description,omitempty"`
 	// Type of the DPU Extension Service

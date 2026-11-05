@@ -35,6 +35,15 @@ func TestValidateLabels(t *testing.T) {
 		{name: "value too long", labels: map[string]string{"k": strings.Repeat("v", LabelValueMaxLength+1)}, wantErr: ErrValidationLabelValueLength},
 		{name: "NUL key", labels: map[string]string{"k\x00": "v"}, wantErr: ErrValidationLabelNUL},
 		{name: "NUL value", labels: map[string]string{"k": "v\x00"}, wantErr: ErrValidationLabelNUL},
+		{
+			name:    "non-ASCII key",
+			labels:  map[string]string{"région": "east"},
+			wantErr: errors.New("label keys must contain ASCII characters only"),
+		},
+		{
+			name:   "Unicode value",
+			labels: map[string]string{"region": "東京"},
+		},
 		{name: "valid labels", labels: map[string]string{"ok": "ok"}},
 	}
 
@@ -72,6 +81,11 @@ func TestValidateNameCharacters(t *testing.T) {
 		{
 			desc:      "errors with trailing whitespaces",
 			names:     []string{"hello ", "hello\t", "hello\n"},
+			expectErr: true,
+		},
+		{
+			desc:      "non-ASCII names",
+			names:     []string{"café", "東京", "net-😀"},
 			expectErr: true,
 		},
 		{

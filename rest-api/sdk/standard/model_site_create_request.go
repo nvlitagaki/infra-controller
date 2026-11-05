@@ -25,7 +25,7 @@ var _ MappedNullable = &SiteCreateRequest{}
 // SiteCreateRequest Request data to create a Site
 type SiteCreateRequest struct {
 	// Name for the Site
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Description for the Site
 	Description NullableString `json:"description,omitempty"`
 	// Hostname to reach Serial Console for the Site

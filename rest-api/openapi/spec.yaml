@@ -21695,6 +21695,7 @@ components:
             email: johndoe@nvidia.com
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: Name for the Site
           minLength: 2
@@ -21760,6 +21761,7 @@ components:
             email: johndoe@nvidia.com
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -21938,6 +21940,7 @@ components:
               constraintValue: 10
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: Concise and descriptive name for the Allocation
           minLength: 2
@@ -21973,6 +21976,7 @@ components:
           description: Echo Studios resource allocation in SJC4
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -22449,6 +22453,7 @@ components:
           format: uuid
           description: Optional user-specified UUID for the VPC
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           minLength: 2
           maxLength: 256
@@ -22526,6 +22531,7 @@ components:
           description: Virtual network for machines executing Spark jobs v1
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -23528,6 +23534,7 @@ components:
       description: Request data to create an InfiniBand Partition
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           minLength: 2
           maxLength: 256
@@ -23556,6 +23563,7 @@ components:
       description: Request data to update an InfiniBand Partition
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: 'Name of the InfiniBand Partition'
           minLength: 2
@@ -23671,6 +23679,7 @@ components:
       description: Request data to create a SpectrumX Partition
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           minLength: 2
           maxLength: 256
@@ -23931,6 +23940,7 @@ components:
       description: Request data to create an NVLink Logical Partition
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           minLength: 2
           maxLength: 256
@@ -23956,6 +23966,7 @@ components:
       description: Request data to update an NVLink Logical Partition
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -24503,6 +24514,7 @@ components:
       description: Request data to create an OperatingSystem
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           minLength: 2
           maxLength: 256
@@ -24659,6 +24671,7 @@ components:
       description: 'Request data to update an Operating System. For image-based OS, mutable image attributes (image authentication, root filesystem, image disk) can be updated; imageUrl and imageSha identify the underlying image and are immutable after creation. Only iPXE attributes can be updated for iPXE-based OS. A Templated iPXE Operating System can only be updated when it is associated with exactly one Site.'
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -24974,6 +24987,7 @@ components:
       description: Request data to create an Instance Type
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: 'Name of the Instance Type'
           minLength: 2
@@ -25011,6 +25025,7 @@ components:
       description: Request data to update an Instance Type
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -25078,6 +25093,7 @@ components:
             - DPU
           description: Type of the Capability
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
           description: Name of the Capability component
@@ -25644,6 +25660,7 @@ components:
           allowUnhealthyMachine: true
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           minLength: 2
           maxLength: 256
@@ -25824,6 +25841,7 @@ components:
             - a7bf2f9c-12f0-4673-be47-12be6d9e16c8
       properties:
         namePrefix:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           minLength: 2
           maxLength: 240
@@ -26027,6 +26045,7 @@ components:
           applyUpdatesOnReboot: true
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -26828,6 +26847,7 @@ components:
             - DPU
           description: Type of the Capability
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
           description: Name of the Capability component
@@ -33685,6 +33705,7 @@ components:
           protocolVersion: IPv4
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: 'Name of the IP Block'
           minLength: 2
@@ -33732,6 +33753,7 @@ components:
           description: This is the primary IP overlay for SJC4. All IPs are publicly routable
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -33880,6 +33902,7 @@ components:
           format: uuid
           description: Optional user-specified UUID for the Network Security Group
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: 'Name of the Network Security Group'
           minLength: 2
@@ -33927,6 +33950,7 @@ components:
       description: Request data to update a Network Security Group
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -34326,6 +34350,7 @@ components:
             - ff06da79-707a-4069-8623-211d49ae96c8
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: 'Name of the SSHKeyGroup'
         description:
@@ -34363,6 +34388,7 @@ components:
           version: 098f6bcd4621d373cade4e832627b4f6
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -34440,6 +34466,7 @@ components:
           sshKeyGroupId: 0b5be54a-65ee-4a85-9928-90e6bca22dac
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: Name cannot match that name an existing SSH Key
         publicKey:
@@ -34463,6 +34490,7 @@ components:
         - name: sre-ssh-reno-integration
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -34831,6 +34859,7 @@ components:
           data: '{"repoURL":"https://helm-registry.example/dpf","chartName":"storage-client","chartVersion":"2.0.0","serviceID":"storage-client-v2","deployInCluster":false,"security":{"privileged":true,"spiffe":{}},"serviceDaemonSet":{"labels":{"app.kubernetes.io/name":"storage-client"},"annotations":{},"resources":{"nvidia.com/bf_sf":"1"},"updateStrategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":1}}}}'
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type: string
           description: Name for the DPU Extension Service. Must be unique for a given Tenant
         description:
@@ -34894,6 +34923,7 @@ components:
                   path: /var/log/busybox.log
       properties:
         name:
+          pattern: '^[\x00-\x7F]*$'
           type:
             - string
             - 'null'
@@ -35358,9 +35388,11 @@ components:
       title: Labels
       type: object
       maxProperties: 10
+      propertyNames:
+        pattern: '^[\x00-\x7F]*$'
       additionalProperties:
         type: string
-      description: Label keys must not be empty or whitespace-only. Keys and values may contain at most 255 characters and must not contain the Unicode NUL character (U+0000). Empty values are allowed.
+      description: Label keys must contain ASCII characters only and must not be empty or whitespace-only. Values may contain Unicode characters. Keys and values may contain at most 255 characters and must not contain the Unicode NUL character (U+0000). Empty values are allowed.
     MachineLabelSelector:
       title: Machine Label Selector
       type: object
@@ -35368,12 +35400,14 @@ components:
       propertyNames:
         minLength: 1
         maxLength: 255
-        pattern: '^[^\u0000]*[^\s\u0000][^\u0000]*$'
+        allOf:
+          - pattern: '^[^\u0000]*[^\s\u0000][^\u0000]*$'
+          - pattern: '^[\x00-\x7F]*$'
       additionalProperties:
         type: string
         maxLength: 255
         pattern: '^[^\u0000]*$'
-      description: Property names are arbitrary Machine label keys supplied by the caller; there is no predefined set of selector fields. Every property must have a string value; an empty string is allowed, but JSON null is not. Keys must not be empty or whitespace-only. Keys and values may contain at most 255 characters and must not contain the Unicode NUL character (U+0000).
+      description: Property names are arbitrary Machine label keys supplied by the caller; there is no predefined set of selector fields. Every property must have a string value; an empty string is allowed, but JSON null is not. Keys must contain ASCII characters only and must not be empty or whitespace-only. Values may contain Unicode characters. Keys and values may contain at most 255 characters and must not contain the Unicode NUL character (U+0000).
       examples:
         - custom-machine-label: required-value
         - empty-value-label: ''

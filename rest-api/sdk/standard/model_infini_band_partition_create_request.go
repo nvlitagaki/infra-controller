@@ -25,7 +25,7 @@ var _ MappedNullable = &InfiniBandPartitionCreateRequest{}
 // InfiniBandPartitionCreateRequest Request data to create an InfiniBand Partition
 type InfiniBandPartitionCreateRequest struct {
 	// Name of the Partition to create
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Optional description of the Partition
 	Description NullableString `json:"description,omitempty"`
 	// ID of the Site the Partition should belong to

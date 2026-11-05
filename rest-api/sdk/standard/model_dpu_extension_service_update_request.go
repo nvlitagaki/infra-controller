@@ -23,7 +23,7 @@ var _ MappedNullable = &DpuExtensionServiceUpdateRequest{}
 // DpuExtensionServiceUpdateRequest Request data to update an existing DPU Extension Service
 type DpuExtensionServiceUpdateRequest struct {
 	// Name for the DPU Extension Service. Must be unique for a given Tenant
-	Name NullableString `json:"name,omitempty"`
+	Name NullableString `json:"name,omitempty" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Optional description for the DPU Extension Service
 	Description NullableString                               `json:"description,omitempty"`
 	Data        NullableDpuExtensionServiceUpdateRequestData `json:"data,omitempty"`

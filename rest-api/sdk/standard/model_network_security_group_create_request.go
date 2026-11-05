@@ -27,7 +27,7 @@ type NetworkSecurityGroupCreateRequest struct {
 	// Optional user-specified UUID for the Network Security Group
 	Id *string `json:"id,omitempty"`
 	// Name of the Network Security Group
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Description of the Network Security Group
 	Description NullableString `json:"description,omitempty"`
 	// ID of the Site

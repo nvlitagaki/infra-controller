@@ -25,7 +25,7 @@ var _ MappedNullable = &SshKeyGroupCreateRequest{}
 // SshKeyGroupCreateRequest Request data to create an SSH Key Group
 type SshKeyGroupCreateRequest struct {
 	// Name of the SSHKeyGroup
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Description of the SSHKeyGroup
 	Description NullableString `json:"description,omitempty"`
 	// List of Site objects

@@ -10,9 +10,12 @@ import (
 
 	cutil "github.com/NVIDIA/infra-controller/rest-api/common/pkg/util"
 	cdbm "github.com/NVIDIA/infra-controller/rest-api/db/pkg/db/model"
+	"github.com/NVIDIA/infra-controller/rest-api/openapi"
 	"github.com/google/uuid"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestAPISpectrumXPartitionCreateRequest_Validate(t *testing.T) {
@@ -171,4 +174,55 @@ func TestNewAPISpectrumXPartitionSummary(t *testing.T) {
 		assert.Equal(t, siteID.String(), got.SiteID)
 		assert.Equal(t, cdbm.SpectrumXPartitionStatusReady, got.Status)
 	})
+}
+
+// The published schema must reject the same non-ASCII metadata as REST before
+// requests reach Core, while preserving Unicode label values.
+func TestAPISpectrumXPartitionCreateRequest_OpenAPISchema(t *testing.T) {
+	var document map[string]any
+	require.NoError(t, yaml.Unmarshal(openapi.Spec, &document))
+	compiler := jsonschema.NewCompiler()
+	compiler.DefaultDraft(jsonschema.Draft2020)
+	require.NoError(t, compiler.AddResource("metadata.json", document))
+	schema, err := compiler.Compile("metadata.json#/components/schemas/SpectrumXPartitionCreateRequest")
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name          string
+		partitionName string
+		labels        map[string]any
+		wantErr       bool
+	}{
+		{
+			name:          "ASCII metadata",
+			partitionName: "east-west-net",
+			labels:        map[string]any{"region": "east"},
+		},
+		{
+			name:          "Unicode label value",
+			partitionName: "east-west-net",
+			labels:        map[string]any{"region": "東京"},
+		},
+		{
+			name:          "non-ASCII name",
+			partitionName: "réseau",
+			labels:        map[string]any{},
+			wantErr:       true,
+		},
+		{
+			name:          "non-ASCII label key",
+			partitionName: "east-west-net",
+			labels:        map[string]any{"région": "east"},
+			wantErr:       true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := schema.Validate(map[string]any{
+				"name":   tc.partitionName,
+				"siteId": uuid.NewString(),
+				"labels": tc.labels,
+			})
+			assert.Equal(t, tc.wantErr, err != nil, "%v", err)
+		})
+	}
 }

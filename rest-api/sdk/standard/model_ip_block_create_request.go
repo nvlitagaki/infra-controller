@@ -25,7 +25,7 @@ var _ MappedNullable = &IpBlockCreateRequest{}
 // IpBlockCreateRequest Request data for creating IP block
 type IpBlockCreateRequest struct {
 	// Name of the IP Block
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Description of the IP Block
 	Description NullableString `json:"description,omitempty"`
 	// ID of the site

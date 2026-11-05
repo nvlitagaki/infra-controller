@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	validationis "github.com/go-ozzo/ozzo-validation/v4/is"
 
 	cutil "github.com/NVIDIA/infra-controller/rest-api/common/pkg/util"
 	cdbm "github.com/NVIDIA/infra-controller/rest-api/db/pkg/db/model"
@@ -132,7 +133,7 @@ func ValidateEffectiveUserData(userData *string) error {
 	}
 }
 
-// ValidateLabels validates optional API label maps (count, keys, values).
+// ValidateLabels validates optional API label maps (count, ASCII keys, Unicode values).
 // Signature matches ozzo's `validation.RuleFunc` so it can be used
 // directly inside a `validation.By(...)` call from a struct's `Validate`.
 // Returns nil when labels is nil; ignores values that aren't a
@@ -170,6 +171,7 @@ func ValidateLabels(value interface{}) error {
 		}
 
 		err := validation.Validate(key,
+			validationis.ASCII.Error("label keys must contain ASCII characters only"),
 			validation.Match(NotAllWhitespaceRegexp).Error("label key consists only of whitespace"),
 			validation.Length(1, LabelKeyMaxLength).Error(keyErrMsg),
 		)
@@ -219,10 +221,18 @@ func ValidateNested(target interface{}, fieldRules ...*validation.FieldRules) *v
 	}))
 }
 
-// ValidateNameCharacters is a utility function to lexically validate the name field
-// Currently checks for leading or trailing whitespaces
-// NOTE: Can only be used in conjunction with validation.Required or with validation.When(name != nil, validation.By(util.ValidateNameCharacters))
+// ValidateNameCharacters validates ASCII names without leading or trailing whitespace.
+// Use with validation.Required or validation.When(name != nil, ...).
 func ValidateNameCharacters(value interface{}) error {
+	return validation.Validate(value,
+		validation.By(ValidateNameWhitespace),
+		validationis.ASCII.Error("name field must contain ASCII characters only"),
+	)
+}
+
+// ValidateNameWhitespace rejects leading or trailing whitespace without restricting
+// the character set, for fields such as machine-validation commands and arguments.
+func ValidateNameWhitespace(value interface{}) error {
 	s, ok := value.(string)
 	var name string
 	if !ok {

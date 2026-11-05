@@ -23,6 +23,14 @@ func TestAPIMachineValidationTestCreateRequest_Validate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			desc: "Unicode command and arguments",
+			obj: APIMachineValidationTestCreateRequest{
+				Name:    "test-1",
+				Command: "/bin/検証",
+				Args:    "--region 東京",
+			},
+		},
+		{
 			desc:      "error no Name",
 			obj:       APIMachineValidationTestCreateRequest{Command: "/bin/sh/test1", Args: "-p 12"},
 			expectErr: true,

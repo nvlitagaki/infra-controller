@@ -548,3 +548,68 @@ API GET /v2/org/{org}/nico/instance/{instanceId} added `#/components/schemas/Net
 API GET /v2/org/{org}/nico/instance/{instanceId} the `networkSecurityGroupPropagationDetails` response's property `type` changed from `object` to `any` for status `200`
 API PATCH /v2/org/{org}/nico/instance/{instanceId} added `#/components/schemas/NetworkSecurityGroupPropagationDetails, subschema #2` to the `networkSecurityGroupPropagationDetails` response property `oneOf` list for the response status `200`
 API PATCH /v2/org/{org}/nico/instance/{instanceId} the `networkSecurityGroupPropagationDetails` response's property `type` changed from `object` to `any` for status `200`
+
+# Reject non-ASCII names and label keys at REST validation, before Core rejects
+# metadata. Unicode label values remain supported. These exact reports also
+# cover shared name validators and machine-label selectors.
+API POST /v2/org/{org}/nico/allocation added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/allocation/{allocationId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/dpu-extension-service added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/dpu-extension-service/{dpuExtensionServiceId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/expected-machine added 'propertyNames' constraint to the request property `labels`
+API PUT /v2/org/{org}/nico/expected-machine/all added 'propertyNames' constraint to the request property `expectedMachines/items/labels`
+API PATCH /v2/org/{org}/nico/expected-machine/batch added 'propertyNames' constraint to the request property `items/labels`
+API POST /v2/org/{org}/nico/expected-machine/batch added 'propertyNames' constraint to the request property `items/labels`
+API PATCH /v2/org/{org}/nico/expected-machine/{expectedMachineId} added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/expected-power-shelf added 'propertyNames' constraint to the request property `labels`
+API PUT /v2/org/{org}/nico/expected-power-shelf/all added 'propertyNames' constraint to the request property `expectedPowerShelves/items/labels`
+API PATCH /v2/org/{org}/nico/expected-power-shelf/{expectedPowerShelfId} added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/expected-rack added 'propertyNames' constraint to the request property `labels`
+API PUT /v2/org/{org}/nico/expected-rack added 'propertyNames' constraint to the request property `expectedRacks/items/labels`
+API PATCH /v2/org/{org}/nico/expected-rack-group/{id} added 'propertyNames' constraint to the request property `labels/oneOf[subschema #1: Labels]/`
+API PUT /v2/org/{org}/nico/expected-rack/all added 'propertyNames' constraint to the request property `expectedRacks/items/labels`
+API PATCH /v2/org/{org}/nico/expected-rack/{id} added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/expected-switch added 'propertyNames' constraint to the request property `labels`
+API PUT /v2/org/{org}/nico/expected-switch/all added 'propertyNames' constraint to the request property `expectedSwitches/items/labels`
+API PATCH /v2/org/{org}/nico/expected-switch/{expectedSwitchId} added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/infiniband-partition added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/infiniband-partition added 'propertyNames' constraint to the request property `labels`
+API PATCH /v2/org/{org}/nico/infiniband-partition/{infiniBandPartitionId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/infiniband-partition/{infiniBandPartitionId} added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/instance added `subschema #1, subschema #2` to the `machineLabelSelector/propertyNames/` request property `allOf` list
+API POST /v2/org/{org}/nico/instance added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/instance added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/instance/batch added `subschema #1, subschema #2` to the `machineLabelSelector/propertyNames/` request property `allOf` list
+API POST /v2/org/{org}/nico/instance/batch added the pattern `^[\x00-\x7F]*$` to the request property `namePrefix`
+API POST /v2/org/{org}/nico/instance/batch added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/instance/type added the pattern `^[\x00-\x7F]*$` to the request property `machineCapabilities/items/name`
+API POST /v2/org/{org}/nico/instance/type added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/instance/type added 'propertyNames' constraint to the request property `labels`
+API PATCH /v2/org/{org}/nico/instance/type/{instanceTypeId} added the pattern `^[\x00-\x7F]*$` to the request property `machineCapabilities/items/name`
+API PATCH /v2/org/{org}/nico/instance/type/{instanceTypeId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/instance/type/{instanceTypeId} added 'propertyNames' constraint to the request property `labels`
+API PATCH /v2/org/{org}/nico/instance/{instanceId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/instance/{instanceId} added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/ipblock added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/ipblock/{ipBlockId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/machine/{machineId} added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/network-security-group added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/network-security-group added 'propertyNames' constraint to the request property `labels`
+API PATCH /v2/org/{org}/nico/network-security-group/{networkSecurityGroupId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/network-security-group/{networkSecurityGroupId} added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/nvlink-logical-partition added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/nvlink-logical-partition/{nvLinkLogicalPartitionId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/operating-system added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/operating-system/{operatingSystemId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/site added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/site/{siteId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/spectrumx-partition added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/spectrumx-partition added 'propertyNames' constraint to the request property `labels`
+API POST /v2/org/{org}/nico/sshkey added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/sshkey/{sshKeyId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/sshkeygroup added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/sshkeygroup/{sshKeyGroupId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/vpc added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API POST /v2/org/{org}/nico/vpc added 'propertyNames' constraint to the request property `labels`
+API PATCH /v2/org/{org}/nico/vpc/{vpcId} added the pattern `^[\x00-\x7F]*$` to the request property `name`
+API PATCH /v2/org/{org}/nico/vpc/{vpcId} added 'propertyNames' constraint to the request property `labels`

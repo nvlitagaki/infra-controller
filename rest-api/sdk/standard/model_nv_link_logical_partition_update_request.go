@@ -23,7 +23,7 @@ var _ MappedNullable = &NVLinkLogicalPartitionUpdateRequest{}
 // NVLinkLogicalPartitionUpdateRequest Request data to update an NVLink Logical Partition
 type NVLinkLogicalPartitionUpdateRequest struct {
 	// Updated name for the NVLink Logical Partition
-	Name NullableString `json:"name,omitempty"`
+	Name NullableString `json:"name,omitempty" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Updated description for the NVLink Logical Partition
 	Description NullableString `json:"description,omitempty"`
 }

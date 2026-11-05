@@ -25,7 +25,7 @@ var _ MappedNullable = &SshKeyGroupUpdateRequest{}
 // SshKeyGroupUpdateRequest Request data to update an SSH Key Group
 type SshKeyGroupUpdateRequest struct {
 	// Name of the SSHKeyGroup
-	Name NullableString `json:"name,omitempty"`
+	Name NullableString `json:"name,omitempty" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Description of the SSHKeyGroup
 	Description NullableString `json:"description,omitempty"`
 	// When specified, replaces existing Site associations

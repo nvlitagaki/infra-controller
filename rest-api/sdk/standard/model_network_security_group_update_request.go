@@ -23,7 +23,7 @@ var _ MappedNullable = &NetworkSecurityGroupUpdateRequest{}
 // NetworkSecurityGroupUpdateRequest Request data to update a Network Security Group
 type NetworkSecurityGroupUpdateRequest struct {
 	// Name of the Network Security Group
-	Name NullableString `json:"name,omitempty"`
+	Name NullableString `json:"name,omitempty" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Description of the Network Security Group
 	Description NullableString `json:"description,omitempty"`
 	// Egress rules with protocol and destination ports defined but without source ports defined should automatically be made stateful.

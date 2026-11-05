@@ -25,7 +25,7 @@ var _ MappedNullable = &SshKeyCreateRequest{}
 // SshKeyCreateRequest Request data to create an SSH key
 type SshKeyCreateRequest struct {
 	// Name cannot match that name an existing SSH Key
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Must be an SSH key of type: RSA, ECDSA or ED25519
 	PublicKey string `json:"publicKey" validate:"regexp=^ssh-(rsa|ecdsa|ed25519) AAAA[0-9A-Za-z+/]+[=]{0\\,3}(\\s+.+)?$"`
 	// ID of the SSH Key Group this key should be attached to

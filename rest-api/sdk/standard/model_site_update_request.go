@@ -23,7 +23,7 @@ var _ MappedNullable = &SiteUpdateRequest{}
 // SiteUpdateRequest Request data to update a Site
 type SiteUpdateRequest struct {
 	// Update name of the Site. Can only be updated by Provider
-	Name NullableString `json:"name,omitempty"`
+	Name NullableString `json:"name,omitempty" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Update description for the Site. Can only be updated by Provider
 	Description NullableString `json:"description,omitempty"`
 	// Set to true to issue a new registration token. Can only be updated by Provider

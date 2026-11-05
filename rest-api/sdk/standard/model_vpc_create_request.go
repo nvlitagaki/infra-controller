@@ -27,7 +27,7 @@ type VpcCreateRequest struct {
 	// Optional user-specified UUID for the VPC
 	Id *string `json:"id,omitempty"`
 	// Name of the VPC
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Optional description for the VPC
 	Description NullableString `json:"description,omitempty"`
 	// ID of the Site where the VPC should be created

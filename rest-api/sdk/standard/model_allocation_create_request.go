@@ -25,7 +25,7 @@ var _ MappedNullable = &AllocationCreateRequest{}
 // AllocationCreateRequest Request data to create an Allocation
 type AllocationCreateRequest struct {
 	// Concise and descriptive name for the Allocation
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Detailed description for the Allocation
 	Description NullableString `json:"description,omitempty"`
 	// ID of the Tenant that should receive the Allocation

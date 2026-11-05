@@ -25,7 +25,7 @@ var _ MappedNullable = &InstanceCreateRequest{}
 // InstanceCreateRequest Request data to create an Instance.  The primary `vpcId` must be owned by the Instance Tenant. Additional Interfaces may select same-Site Ready FNN VPCs or explicit VPC Prefixes owned by another Tenant only when the caller is a Tenant Admin and the Instance Tenant has effective `crossTenantInterfaceCreation` capability at the Instance Site. The capability does not authorize cross-Tenant Subnet selectors or grant cross-Tenant VPC or VPC Prefix discovery or CRUD access.  The primary physical Interface must select the primary `vpcId`, directly or through one of its VPC Prefixes. When device metadata is present, the primary physical Interface is the PF with `deviceInstance: 0`; a VF with `deviceInstance: 0` is not primary. Legacy requests without device metadata use the first physical Interface. Instance-level Network Security Group policy takes precedence over VPC-level policy on every Interface, including cross-Tenant VPC Interfaces.
 type InstanceCreateRequest struct {
 	// Name of the Instance
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Description of the Instance, optional
 	Description NullableString `json:"description,omitempty"`
 	// ID of the Tenant creating the Instance

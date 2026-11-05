@@ -25,7 +25,7 @@ var _ MappedNullable = &NVLinkLogicalPartitionCreateRequest{}
 // NVLinkLogicalPartitionCreateRequest Request data to create an NVLink Logical Partition
 type NVLinkLogicalPartitionCreateRequest struct {
 	// Name of the NVLink Logical Partition to create
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Optional description of the NVLink Logical Partition
 	Description NullableString `json:"description,omitempty"`
 	// ID of the Site the NVLink Logical Partition should belong to

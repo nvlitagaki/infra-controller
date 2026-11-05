@@ -23,7 +23,7 @@ var _ MappedNullable = &VpcUpdateRequest{}
 // VpcUpdateRequest Request data to update a VPC
 type VpcUpdateRequest struct {
 	// Updated name of the VPC
-	Name NullableString `json:"name,omitempty"`
+	Name NullableString `json:"name,omitempty" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Updated description of the VPC
 	Description NullableString `json:"description,omitempty"`
 	// ID of the Network Security Group to attach to the VPC

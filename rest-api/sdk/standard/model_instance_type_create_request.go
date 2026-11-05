@@ -25,7 +25,7 @@ var _ MappedNullable = &InstanceTypeCreateRequest{}
 // InstanceTypeCreateRequest Request data to create an Instance Type
 type InstanceTypeCreateRequest struct {
 	// Name of the Instance Type
-	Name string `json:"name"`
+	Name string `json:"name" validate:"regexp=^[\\x00-\\x7F]*$"`
 	// Description of the Instance Type
 	Description NullableString `json:"description,omitempty"`
 	// ID of the site
