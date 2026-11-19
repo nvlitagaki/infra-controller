@@ -431,7 +431,7 @@ func (asd AllocationSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter Alloca
 		return nil, 0, err
 	}
 
-	err = allocationPaginator.Query.Limit(allocationPaginator.Limit).Offset(allocationPaginator.Offset).Scan(ctx)
+	err = allocationPaginator.Query.Limit(int64(allocationPaginator.Limit)).Offset(int64(allocationPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -573,7 +573,8 @@ func (asd AllocationSQLDAO) GetCount(ctx context.Context, tx *db.Tx, filter Allo
 		return 0, err
 	}
 
-	return query.Count(ctx)
+	total, err := query.Count(ctx)
+	return int(total), err
 }
 
 // NewAllocationDAO returns a new AllocationDAO

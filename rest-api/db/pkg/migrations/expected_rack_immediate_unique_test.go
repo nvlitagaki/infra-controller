@@ -29,7 +29,7 @@ func TestExpectedRackImmediateUniqueUpMigration(t *testing.T) {
 	otherSite := model.TestBuildSite(t, session, provider, "other-site", user)
 	for _, migration := range Migrations.Sorted() {
 		if migration.Name == "20260429100000" {
-			require.NoError(t, migration.Up(ctx, session.DB))
+			require.NoError(t, migration.Up(ctx, migrate.NewMigrator(session.DB, Migrations), &migration))
 		}
 	}
 	dao := model.NewExpectedRackDAO(session)

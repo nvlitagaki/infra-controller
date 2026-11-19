@@ -790,7 +790,7 @@ func TestTx_WithSavepoint(t *testing.T) {
 				xids, xerr := GetIDB(tx, dbSession).NewSelect().TableExpr("pg_locks").
 					Where("locktype = 'transactionid'").Where("pid = pg_backend_pid()").Count(ctx)
 				require.NoError(t, xerr)
-				assert.Equal(t, 1, xids, "every rolled back savepoint must also be released")
+				assert.Equal(t, int64(1), xids, "every rolled back savepoint must also be released")
 			}
 		})
 	}

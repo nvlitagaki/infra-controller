@@ -59,8 +59,8 @@ func (s *Store) List(
 	query := eventRuleListQuery(s.pg.DB.NewSelect().Model(&records), request.Filter)
 	err = query.
 		OrderExpr("er.id ASC").
-		Offset(request.Offset).
-		Limit(request.Limit).
+		Offset(int64(request.Offset)).
+		Limit(int64(request.Limit)).
 		Scan(ctx)
 	if err != nil {
 		return eventrule.RuleListPage{}, err
@@ -76,7 +76,7 @@ func (s *Store) List(
 		rules[i] = rule
 	}
 
-	return eventrule.RuleListPage{Rules: rules, Total: total}, nil
+	return eventrule.RuleListPage{Rules: rules, Total: int(total)}, nil
 }
 
 func eventRuleListQuery(

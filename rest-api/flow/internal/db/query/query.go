@@ -101,7 +101,7 @@ func New(ctx context.Context, conf *Config) (*Query, error) {
 	}
 
 	if conf.Pagination != nil {
-		q = q.Offset(conf.Pagination.Offset).Limit(conf.Pagination.Limit)
+		q = q.Offset(int64(conf.Pagination.Offset)).Limit(int64(conf.Pagination.Limit))
 	}
 
 	query := &Query{
@@ -117,7 +117,7 @@ func New(ctx context.Context, conf *Config) (*Query, error) {
 			return nil, fmt.Errorf("failed to count total: %w", err)
 		}
 
-		query.pagination.Total = total
+		query.pagination.Total = int(total)
 	}
 
 	return query, nil

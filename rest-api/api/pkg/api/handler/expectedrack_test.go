@@ -2098,7 +2098,7 @@ func TestDeleteAllExpectedRacksHandler_Handle(t *testing.T) {
 		require.Len(t, mockTemporalClient.Calls, callsBefore, "lock conflict must not reach Core")
 		count, err := dbSession.DB.NewSelect().Model((*cdbm.ExpectedRack)(nil)).Where("site_id = ?", site.ID).Count(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 3, count)
+		require.Equal(t, int64(3), count)
 	})
 
 	tests := []struct {

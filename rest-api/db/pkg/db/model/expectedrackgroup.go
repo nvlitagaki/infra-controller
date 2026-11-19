@@ -564,7 +564,7 @@ func (erd ExpectedRackGroupSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter
 		return nil, 0, err
 	}
 
-	err = expectedRackGroupPaginator.Query.OrderExpr("er.id ASC").Limit(expectedRackGroupPaginator.Limit).Offset(expectedRackGroupPaginator.Offset).Scan(ctx)
+	err = expectedRackGroupPaginator.Query.OrderExpr("er.id ASC").Limit(int64(expectedRackGroupPaginator.Limit)).Offset(int64(expectedRackGroupPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

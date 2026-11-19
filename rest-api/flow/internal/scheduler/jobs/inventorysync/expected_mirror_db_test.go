@@ -425,7 +425,7 @@ func TestMirrorRacks_UnlabelledRacksDoNotCollapse(t *testing.T) {
 
 	n, err := pool.DB.NewSelect().Model((*model.Rack)(nil)).Where("manufacturer = ?", "NVIDIA").Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 4, n, "every serial-less rack must be mirrored, not deduplicated onto one chassis key")
+	assert.Equal(t, int64(4), n, "every serial-less rack must be mirrored, not deduplicated onto one chassis key")
 }
 
 // A rack the mirror has never reached is adopted by its chassis pair: Core's
@@ -440,7 +440,7 @@ func TestMirrorRacks_LegacyRackAdoptedByNaturalKey(t *testing.T) {
 
 	total, err := pool.DB.NewSelect().Model((*model.Rack)(nil)).Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 1, total, "adoption must reuse the existing row, not insert a second rack")
+	assert.Equal(t, int64(1), total, "adoption must reuse the existing row, not insert a second rack")
 
 	got, err := (&model.Rack{ID: legacy.ID}).GetIncludingDeleted(ctx, pool.DB)
 	require.NoError(t, err)
@@ -504,11 +504,11 @@ func TestMirrorRacks_DuplicateChassisNoAbort(t *testing.T) {
 
 	total, err := pool.DB.NewSelect().Model((*model.Rack)(nil)).Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 2, total, "both racks must be mirrored under their own rack_id")
+	assert.Equal(t, int64(2), total, "both racks must be mirrored under their own rack_id")
 
 	withSerial, err := pool.DB.NewSelect().Model((*model.Rack)(nil)).Where("serial_number = ?", "DUP-1").Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 1, withSerial, "only one rack may hold the contested chassis pair")
+	assert.Equal(t, int64(1), withSerial, "only one rack may hold the contested chassis pair")
 }
 
 // Names are Core metadata, not identity. Two Core racks with the same name are
@@ -523,7 +523,7 @@ func TestMirrorRacks_DuplicateNamesBothConverge(t *testing.T) {
 
 	total, err := pool.DB.NewSelect().Model((*model.Rack)(nil)).Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 2, total)
+	assert.Equal(t, int64(2), total)
 
 	var got []model.Rack
 	require.NoError(t, pool.DB.NewSelect().Model(&got).Where("name = ?", "same-name").Order("external_id").Scan(ctx))
@@ -682,7 +682,7 @@ func TestMirrorRacks_NameCollisionWithLiveRackConverges(t *testing.T) {
 
 	n, err := pool.DB.NewSelect().Model((*model.Rack)(nil)).Where("name = ?", "collide").Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 2, n)
+	assert.Equal(t, int64(2), n)
 }
 
 // --- component mirror -----------------------------------------------------
@@ -1062,11 +1062,11 @@ func TestMirrorComponents_DuplicateSerialNoAbort(t *testing.T) {
 
 	total, err := pool.DB.NewSelect().Model((*model.Component)(nil)).Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 2, total, "both components must be mirrored under their own BMC MAC")
+	assert.Equal(t, int64(2), total, "both components must be mirrored under their own BMC MAC")
 
 	withSerial, err := pool.DB.NewSelect().Model((*model.Component)(nil)).Where("serial_number = ?", "C-DUP").Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 1, withSerial, "only one component may hold the contested manufacturer and serial")
+	assert.Equal(t, int64(1), withSerial, "only one component may hold the contested manufacturer and serial")
 }
 
 // Core reporting the same BMC MAC on two specs is a Core-side fault:
@@ -1082,7 +1082,7 @@ func TestMirrorComponents_DuplicateMACSkipsLaterSpec(t *testing.T) {
 
 	total, err := pool.DB.NewSelect().Model((*model.Component)(nil)).Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 1, total, "only the first spec on a MAC may be mirrored")
+	assert.Equal(t, int64(1), total, "only the first spec on a MAC may be mirrored")
 }
 
 // A spec carrying only a BMC MAC is mirrored; manufacturer and serial land as
@@ -1126,7 +1126,7 @@ func TestMirrorComponents_ClearingLabelsReleasesUniqueSlots(t *testing.T) {
 		Where("serial_number IS NULL").
 		Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, len(specs), nullLabels)
+	assert.Equal(t, int64(len(specs)), nullLabels)
 }
 
 // Relabelling a chassis in Core must not fork the component: the host BMC MAC
@@ -1173,7 +1173,7 @@ func TestMirrorComponents_MatchByMACSurvivesRelabel(t *testing.T) {
 
 			total, err := pool.DB.NewSelect().Model((*model.Component)(nil)).Count(ctx)
 			require.NoError(t, err)
-			assert.Equal(t, 1, total, "the MAC match must update in place, not insert a second component")
+			assert.Equal(t, int64(1), total, "the MAC match must update in place, not insert a second component")
 
 			got, err := (&model.Component{ID: component.ID}).GetIncludingDeleted(ctx, pool.DB)
 			require.NoError(t, err)
@@ -1271,7 +1271,7 @@ func TestMirrorComponents_ChassisLabelOwnershipTransitions(t *testing.T) {
 
 			total, err := pool.DB.NewSelect().Model((*model.Component)(nil)).Count(ctx)
 			require.NoError(t, err)
-			assert.Equal(t, len(tc.initial), total)
+			assert.Equal(t, int64(len(tc.initial)), total)
 			for _, desired := range tc.desired {
 				id := idsByName[desired.name]
 				got, err := (&model.Component{ID: id}).GetIncludingDeleted(ctx, pool.DB)
@@ -1367,7 +1367,7 @@ func TestMirrorComponents_BMCBoardSwapAdoptsByNaturalKey(t *testing.T) {
 
 	total, err := pool.DB.NewSelect().Model((*model.Component)(nil)).Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 1, total, "the natural key must adopt the existing row, not insert a second component")
+	assert.Equal(t, int64(1), total, "the natural key must adopt the existing row, not insert a second component")
 
 	got, err := (&model.Component{ID: c.ID}).GetIncludingDeleted(ctx, pool.DB)
 	require.NoError(t, err)

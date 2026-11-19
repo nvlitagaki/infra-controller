@@ -131,7 +131,8 @@ func GetTestDBSession(t *testing.T, reset bool) *db.Session {
 
 // GetDBConnectionCount returns the count of rows in the pg_stat_activity table
 func GetDBConnectionCount(dbSession *db.Session) (int, error) {
-	return dbSession.DB.NewSelect().Table("pg_stat_activity").Count(context.Background())
+	count, err := dbSession.DB.NewSelect().Table("pg_stat_activity").Count(context.Background())
+	return int(count), err
 }
 
 // TestInitDB initializes a test DB session

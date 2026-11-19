@@ -94,7 +94,7 @@ func TestTask_UpdateTaskStatus(t *testing.T) {
 		db := bun.NewDB(sqlDB, pgdialect.New())
 		defer db.Close()
 
-		mock.ExpectExec(`UPDATE "task" AS "t" SET .*"queue_expires_at" = NULL.* WHERE \(id =`).
+		mock.ExpectExec(`UPDATE "task" AS "t" SET .*"queue_expires_at" = DEFAULT.* WHERE \(id =`).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		deadline := time.Now().Add(time.Hour).UTC()
 		task := &Task{ID: uuid.New(), QueueExpiresAt: &deadline}
@@ -248,7 +248,7 @@ func TestTaskComponentIDFilter_GeneratedSQL(t *testing.T) {
 	q := db.NewSelect().TableExpr("task")
 	q = taskComponentIDFilter{componentID: compID}.ApplyTo(q)
 
-	sql, err := q.AppendQuery(db.Formatter(), nil)
+	sql, err := q.AppendQuery(db.QueryGen(), nil)
 	require.NoError(t, err)
 	got := string(sql)
 
@@ -278,7 +278,7 @@ func TestTaskListOptionsToFilterable_FullQuerySQL(t *testing.T) {
 	q := db.NewSelect().TableExpr("task")
 	q = got.ApplyTo(q)
 
-	sql, err := q.AppendQuery(db.Formatter(), nil)
+	sql, err := q.AppendQuery(db.QueryGen(), nil)
 	require.NoError(t, err)
 	gotSQL := string(sql)
 
@@ -308,7 +308,7 @@ func TestListTasksForRacksByStatus_GeneratedSQL(t *testing.T) {
 		[]uuid.UUID{rackID},
 		taskcommon.NonTerminalTaskStatuses(),
 	)
-	sql, err := q.AppendQuery(db.Formatter(), nil)
+	sql, err := q.AppendQuery(db.QueryGen(), nil)
 	require.NoError(t, err)
 	got := string(sql)
 

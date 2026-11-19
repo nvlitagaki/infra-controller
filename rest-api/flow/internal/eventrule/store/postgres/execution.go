@@ -60,7 +60,7 @@ func (s *Store) claimExecutions(
 		var records []dbmodel.EventActionExecution
 		query := tx.NewSelect().
 			Model(&records).
-			Limit(request.Limit).
+			Limit(int64(request.Limit)).
 			For("UPDATE SKIP LOCKED")
 
 		switch kind {

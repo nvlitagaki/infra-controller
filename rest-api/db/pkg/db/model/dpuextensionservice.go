@@ -522,7 +522,7 @@ func (dessd DpuExtensionServiceSQLDAO) GetAll(ctx context.Context, tx *db.Tx, fi
 		return nil, 0, err
 	}
 
-	err = paginatorObj.Query.Limit(paginatorObj.Limit).Offset(paginatorObj.Offset).Scan(ctx)
+	err = paginatorObj.Query.Limit(int64(paginatorObj.Limit)).Offset(int64(paginatorObj.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

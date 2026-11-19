@@ -476,7 +476,7 @@ func (ifcd InterfaceSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter Interf
 		dbPaginator.Query = dbPaginator.Query.OrderExpr("ifc.id ASC")
 	}
 
-	err = dbPaginator.Query.Limit(dbPaginator.Limit).Offset(dbPaginator.Offset).Scan(ctx)
+	err = dbPaginator.Query.Limit(int64(dbPaginator.Limit)).Offset(int64(dbPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

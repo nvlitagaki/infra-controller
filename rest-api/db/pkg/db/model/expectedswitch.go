@@ -644,7 +644,7 @@ func (essd ExpectedSwitchSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter E
 		return nil, 0, err
 	}
 
-	err = expectedSwitchPaginator.Query.Limit(expectedSwitchPaginator.Limit).Offset(expectedSwitchPaginator.Offset).Scan(ctx)
+	err = expectedSwitchPaginator.Query.Limit(int64(expectedSwitchPaginator.Limit)).Offset(int64(expectedSwitchPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

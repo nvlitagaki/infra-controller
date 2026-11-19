@@ -123,7 +123,7 @@ func NewPaginatorMultiOrderBy(ctx context.Context, query *bun.SelectQuery, offse
 		return nil, fmt.Errorf("%w: %w", ErrQueryTotalCount, err)
 	}
 
-	paginator.Total = total
+	paginator.Total = int(total)
 
 	if offset != nil {
 		paginator.Offset = *offset
@@ -135,7 +135,7 @@ func NewPaginatorMultiOrderBy(ctx context.Context, query *bun.SelectQuery, offse
 	if limit != nil {
 		paginator.Limit = *limit
 		if *limit == TotalLimit {
-			paginator.Limit = total
+			paginator.Limit = int(total)
 		} else if *limit < 0 {
 			paginator.Limit = DefaultLimit
 		}

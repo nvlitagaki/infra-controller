@@ -402,7 +402,7 @@ func (erd ExpectedRackSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter Expe
 		return nil, 0, err
 	}
 
-	err = expectedRackPaginator.Query.Limit(expectedRackPaginator.Limit).Offset(expectedRackPaginator.Offset).Scan(ctx)
+	err = expectedRackPaginator.Query.Limit(int64(expectedRackPaginator.Limit)).Offset(int64(expectedRackPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

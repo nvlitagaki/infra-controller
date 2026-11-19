@@ -496,7 +496,7 @@ func (epsd ExpectedPowerShelfSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filt
 		return nil, 0, err
 	}
 
-	err = expectedPowerShelfPaginator.Query.Limit(expectedPowerShelfPaginator.Limit).Offset(expectedPowerShelfPaginator.Offset).Scan(ctx)
+	err = expectedPowerShelfPaginator.Query.Limit(int64(expectedPowerShelfPaginator.Limit)).Offset(int64(expectedPowerShelfPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

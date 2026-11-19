@@ -496,11 +496,12 @@ func CountWaitingTasksForRack(
 	idb bun.IDB,
 	rackID uuid.UUID,
 ) (int, error) {
-	return idb.NewSelect().
+	count, err := idb.NewSelect().
 		TableExpr("task").
 		Where("rack_id = ?", rackID).
 		Where("status = ?", taskcommon.TaskStatusWaiting).
 		Count(ctx)
+	return int(count), err
 }
 
 // ListTasks returns all tasks that match the given criteria.

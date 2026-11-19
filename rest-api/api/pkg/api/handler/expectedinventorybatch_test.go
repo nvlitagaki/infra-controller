@@ -527,7 +527,7 @@ func testExpectedMachineBatchCreateStoredIdentity(t *testing.T, test expectedMac
 		require.Empty(t, client.Calls, "a stored MAC duplicate must not reach Core")
 		count, err := dbSession.DB.NewSelect().Model((*cdbm.ExpectedMachine)(nil)).Count(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 1, count)
+		require.Equal(t, int64(1), count)
 	}
 	stored, err := dao.Get(ctx, nil, original.ID, nil, false)
 	require.NoError(t, err)
@@ -720,7 +720,7 @@ func testExpectedMachineRejectsRecreatedSKU(t *testing.T, mutation string) {
 	require.Equal(t, original, stored, "rejected attachment must preserve the existing Expected Machine")
 	count, err := dbSession.DB.NewSelect().Model((*cdbm.ExpectedMachine)(nil)).Count(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 1, count, "rejected attachment must not create an Expected Machine")
+	require.Equal(t, int64(1), count, "rejected attachment must not create an Expected Machine")
 }
 
 func TestReplaceAllExpectedMachinesHandler_Handle(t *testing.T) {

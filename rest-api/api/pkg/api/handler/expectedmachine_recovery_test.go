@@ -667,7 +667,7 @@ func testExpectedMachineLegacyBatch(t *testing.T) {
 			}
 			count, err := f.session.DB.NewSelect().Model((*cdbm.ExpectedMachine)(nil)).Count(f.ctx)
 			require.NoError(t, err)
-			require.Equal(t, tc.wantCount, count)
+			require.Equal(t, int64(tc.wantCount), count)
 			pending, err := cdbm.NewPendingExpectedMachineBatchDAO(f.session).GetAll(f.ctx, nil, f.site.ID)
 			require.NoError(t, err)
 			require.Empty(t, pending)

@@ -286,5 +286,6 @@ func (s *Bundb) close() {
 
 // getConnectionCount will get number of connections to the db
 func (s *Bundb) getConnectionCount() (int, error) {
-	return s.db.NewSelect().Table("pg_stat_activity").Count(context.Background())
+	count, err := s.db.NewSelect().Table("pg_stat_activity").Count(context.Background())
+	return int(count), err
 }

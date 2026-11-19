@@ -218,7 +218,7 @@ func (aed AuditEntrySQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter AuditE
 		return nil, 0, err
 	}
 
-	err = dbPaginator.Query.Limit(dbPaginator.Limit).Offset(dbPaginator.Offset).Scan(ctx)
+	err = dbPaginator.Query.Limit(int64(dbPaginator.Limit)).Offset(int64(dbPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

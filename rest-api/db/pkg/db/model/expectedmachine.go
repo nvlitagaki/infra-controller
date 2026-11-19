@@ -766,7 +766,7 @@ func (emsd ExpectedMachineSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter 
 		return nil, 0, err
 	}
 
-	err = expectedMachinePaginator.Query.Limit(expectedMachinePaginator.Limit).Offset(expectedMachinePaginator.Offset).Scan(ctx)
+	err = expectedMachinePaginator.Query.Limit(int64(expectedMachinePaginator.Limit)).Offset(int64(expectedMachinePaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -806,7 +806,7 @@ func (emsd ExpectedMachineSQLDAO) GetDistinctLabelKeys(ctx context.Context, tx *
 		return nil, 0, err
 	}
 
-	err = labelPaginator.Query.Limit(labelPaginator.Limit).Offset(labelPaginator.Offset).Scan(ctx, &keys)
+	err = labelPaginator.Query.Limit(int64(labelPaginator.Limit)).Offset(int64(labelPaginator.Offset)).Scan(ctx, &keys)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -846,7 +846,7 @@ func (emsd ExpectedMachineSQLDAO) GetDistinctLabelValues(ctx context.Context, tx
 		return nil, 0, err
 	}
 
-	err = labelPaginator.Query.Limit(labelPaginator.Limit).Offset(labelPaginator.Offset).Scan(ctx, &values)
+	err = labelPaginator.Query.Limit(int64(labelPaginator.Limit)).Offset(int64(labelPaginator.Offset)).Scan(ctx, &values)
 	if err != nil {
 		return nil, 0, err
 	}

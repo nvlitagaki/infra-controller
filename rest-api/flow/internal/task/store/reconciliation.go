@@ -24,7 +24,7 @@ func (s *PostgresStore) ListTasksForReconciliation(ctx context.Context, executor
 	err := s.idb(ctx).NewSelect().Model(&rows).Column("id", "rack_id", "execution_id").
 		Where("status IN (?)", bun.In([]taskcommon.TaskStatus{taskcommon.TaskStatusPending, taskcommon.TaskStatusRunning})).
 		Where("executor_type = ?", executor).Where("execution_id <> ''").
-		Where("id > ?", afterID).OrderExpr("id ASC").Limit(limit).Scan(ctx)
+		Where("id > ?", afterID).OrderExpr("id ASC").Limit(int64(limit)).Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list tasks for reconciliation: %w", err)
 	}

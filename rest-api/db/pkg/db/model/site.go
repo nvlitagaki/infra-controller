@@ -372,7 +372,7 @@ func (ssd SiteSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter SiteFilterIn
 		return nil, 0, err
 	}
 
-	err = paginator.Query.Limit(paginator.Limit).Offset(paginator.Offset).Scan(ctx)
+	err = paginator.Query.Limit(int64(paginator.Limit)).Offset(int64(paginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -398,7 +398,8 @@ func (ssd SiteSQLDAO) GetCount(ctx context.Context, tx *db.Tx, filter SiteFilter
 		return 0, err
 	}
 
-	return query.Count(ctx)
+	total, err := query.Count(ctx)
+	return int(total), err
 }
 
 // Create creates a Site from the given parameters

@@ -773,7 +773,7 @@ func (mcd MachineCapabilitySQLDAO) GetAll(
 		return nil, 0, err
 	}
 
-	err = paginator.Query.Limit(paginator.Limit).Offset(paginator.Offset).Scan(ctx)
+	err = paginator.Query.Limit(int64(paginator.Limit)).Offset(int64(paginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -905,7 +905,7 @@ func (mcd MachineCapabilitySQLDAO) GetAllDistinct(
 	// when multiple capabilities share the same type.
 	dbPaginator.Query = dbPaginator.Query.OrderExpr("mc.name ASC, mc.frequency ASC, mc.capacity ASC, mc.vendor ASC, mc.count ASC, mc.device_type ASC, mc.inactive_devices ASC, mc.id ASC")
 
-	err = dbPaginator.Query.Limit(dbPaginator.Limit).Offset(dbPaginator.Offset).Scan(ctx)
+	err = dbPaginator.Query.Limit(int64(dbPaginator.Limit)).Offset(int64(dbPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

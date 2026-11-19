@@ -182,7 +182,7 @@ func (s *PostgresUpdateStore) GetPendingUpdates(ctx context.Context, limit int) 
 			OR predecessor_id IN (SELECT id FROM firmware_update WHERE state = ?)
 		)`, StateCompleted).
 		OrderExpr("sequence_order ASC, created_at ASC").
-		Limit(limit).
+		Limit(int64(limit)).
 		Scan(ctx)
 
 	if err != nil && err != sql.ErrNoRows {
@@ -205,7 +205,7 @@ func (s *PostgresUpdateStore) GetPendingUpdates(ctx context.Context, limit int) 
 		Model(&activeModels).
 		Where("state NOT IN (?, ?, ?, ?)", StateQueued, StateCompleted, StateFailed, StateCancelled).
 		OrderExpr("updated_at ASC NULLS FIRST").
-		Limit(remaining).
+		Limit(int64(remaining)).
 		Scan(ctx)
 
 	if err != nil && err != sql.ErrNoRows {

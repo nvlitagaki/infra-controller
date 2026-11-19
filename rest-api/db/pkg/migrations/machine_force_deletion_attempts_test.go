@@ -96,7 +96,8 @@ func TestMachineForceDeletionAttemptsMigration(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NoError(t, target.Sorted()[0].Up(ctx, session.DB))
+		migration := target.Sorted()[0]
+		require.NoError(t, migration.Up(ctx, migrator, &migration))
 		pending, err := dao.GetByID(ctx, nil, retained.ID, nil, false)
 		require.NoError(t, err)
 		assert.True(t, pending.IsForceDeletionRequested)

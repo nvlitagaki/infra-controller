@@ -379,7 +379,8 @@ func (tasd TenantAccountSQLDAO) GetCount(ctx context.Context, tx *db.Tx, filter 
 		return 0, err
 	}
 
-	return query.Count(ctx)
+	total, err := query.Count(ctx)
+	return int(total), err
 }
 
 // GetAll returns a list of TenantAccounts filtering by tenantID, tenantOrg, infrastructureProviderID, offset, limit and orderBy
@@ -434,7 +435,7 @@ func (tasd TenantAccountSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter Te
 		return nil, 0, err
 	}
 
-	err = newPaginator.Query.Limit(newPaginator.Limit).Offset(newPaginator.Offset).Scan(ctx)
+	err = newPaginator.Query.Limit(int64(newPaginator.Limit)).Offset(int64(newPaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

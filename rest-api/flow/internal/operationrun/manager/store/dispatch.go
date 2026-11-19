@@ -40,7 +40,7 @@ func (s *PostgresStore) FetchRunnableIDs(
 			}),
 		).
 		OrderExpr("orun.updated_at ASC").
-		Limit(limit).
+		Limit(int64(limit)).
 		Scan(ctx, &ids)
 	return ids, err
 }

@@ -606,7 +606,7 @@ func TestCreateExpectedMachineHandler_Handle(t *testing.T) {
 				log.Logger = zerolog.New(zerolog.SyncWriter(&logs))
 				t.Cleanup(func() { log.Logger = previousLogger })
 			}
-			var countBefore int
+			var countBefore int64
 			if tt.rejectsMutation {
 				countBefore, err = dbSession.DB.NewSelect().Model((*cdbm.ExpectedMachine)(nil)).Count(ctx)
 				require.NoError(t, err)

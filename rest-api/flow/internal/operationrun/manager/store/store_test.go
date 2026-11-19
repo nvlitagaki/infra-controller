@@ -320,7 +320,7 @@ func targetPhaseScopeSQL(
 		Where("ort.operation_run_id = ?", runID)
 	q = applyTargetPhaseScope(q, runID, scope)
 
-	sql, err := q.AppendQuery(db.Formatter(), nil)
+	sql, err := q.AppendQuery(db.QueryGen(), nil)
 	require.NoError(t, err)
 	return string(sql)
 }

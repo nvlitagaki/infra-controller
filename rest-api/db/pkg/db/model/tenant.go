@@ -214,7 +214,7 @@ func (tsd TenantSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter TenantFilt
 		return nil, 0, err
 	}
 
-	err = pag.Query.Limit(pag.Limit).Offset(pag.Offset).Scan(ctx)
+	err = pag.Query.Limit(int64(pag.Limit)).Offset(int64(pag.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

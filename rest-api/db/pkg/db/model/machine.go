@@ -783,7 +783,7 @@ func (msd MachineSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter MachineFi
 		return nil, 0, err
 	}
 
-	err = machinePaginator.Query.Limit(machinePaginator.Limit).Offset(machinePaginator.Offset).Scan(ctx)
+	err = machinePaginator.Query.Limit(int64(machinePaginator.Limit)).Offset(int64(machinePaginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -859,7 +859,7 @@ func (msd MachineSQLDAO) GetDistinctLabelKeys(ctx context.Context, tx *db.Tx, fi
 		return nil, 0, err
 	}
 
-	err = labelPaginator.Query.Limit(labelPaginator.Limit).Offset(labelPaginator.Offset).Scan(ctx, &keys)
+	err = labelPaginator.Query.Limit(int64(labelPaginator.Limit)).Offset(int64(labelPaginator.Offset)).Scan(ctx, &keys)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -901,7 +901,7 @@ func (msd MachineSQLDAO) GetDistinctLabelValues(ctx context.Context, tx *db.Tx, 
 		return nil, 0, err
 	}
 
-	err = labelPaginator.Query.Limit(labelPaginator.Limit).Offset(labelPaginator.Offset).Scan(ctx, &values)
+	err = labelPaginator.Query.Limit(int64(labelPaginator.Limit)).Offset(int64(labelPaginator.Offset)).Scan(ctx, &values)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1056,7 +1056,8 @@ func (msd MachineSQLDAO) GetCount(ctx context.Context, tx *db.Tx, filter Machine
 		return 0, err
 	}
 
-	return query.Count(ctx)
+	total, err := query.Count(ctx)
+	return int(total), err
 }
 
 // UpdateMultiple updates multiple Machines with the given parameters using a single bulk UPDATE query

@@ -383,7 +383,7 @@ func (sxpsd SpectrumXPartitionSQLDAO) GetAll(ctx context.Context, tx *db.Tx, fil
 		return nil, 0, err
 	}
 
-	err = paginator.Query.Limit(paginator.Limit).Offset(paginator.Offset).Scan(ctx)
+	err = paginator.Query.Limit(int64(paginator.Limit)).Offset(int64(paginator.Offset)).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
