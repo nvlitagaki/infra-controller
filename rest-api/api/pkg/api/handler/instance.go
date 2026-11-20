@@ -2649,6 +2649,26 @@ func (uih UpdateInstanceHandler) buildInstanceUpdateRequestOsConfig(c echo.Conte
 	}, osID, nil
 }
 
+func matchesNVLinkAssignments(requested []model.APINVLinkInterfaceCreateOrUpdateRequest, existing []cdbm.NVLinkInterface) bool {
+	byGPU := make(map[int]uuid.UUID, len(requested))
+	for _, binding := range requested {
+		if _, duplicate := byGPU[binding.DeviceInstance]; duplicate {
+			return false
+		}
+		byGPU[binding.DeviceInstance] = uuid.MustParse(binding.NVLinkLogicalPartitionID)
+	}
+	for _, row := range existing {
+		if row.Status == cdbm.NVLinkInterfaceStatusDeleting {
+			continue
+		}
+		if id, ok := byGPU[row.DeviceInstance]; !ok || id != row.NVLinkLogicalPartitionID {
+			return false
+		}
+		delete(byGPU, row.DeviceInstance)
+	}
+	return len(byGPU) == 0
+}
+
 // Handle godoc
 // @Summary Update an existing Instance
 // @Description Update an existing Instance for the org
@@ -3473,22 +3493,27 @@ func (uih UpdateInstanceHandler) Handle(c echo.Context) error {
 	}
 
 	const defaultNVLinkUpdateError = "Cannot update NVLink Interfaces if VPC has default NVLink Logical Partition and NVLink Interfaces already exist for the Instance"
-	if apiRequest.NVLinkInterfaces != nil && vpc.NVLinkLogicalPartitionID != nil {
+	checkDefaultNVLink := apiRequest.NVLinkInterfaces != nil && vpc.NVLinkLogicalPartitionID != nil
+	nvLinkAssignmentsToValidate := apiRequest.NVLinkInterfaces
+	if checkDefaultNVLink {
 		nvlIfcDAO := cdbm.NewNVLinkInterfaceDAO(uih.dbSession)
-		nvlIfcs, _, err := nvlIfcDAO.GetAll(ctx, nil, cdbm.NVLinkInterfaceFilterInput{InstanceIDs: []uuid.UUID{instance.ID}}, cdbp.PageInput{Limit: cutil.GetPtr(1)}, nil)
+		nvlIfcs, _, err := nvlIfcDAO.GetAll(ctx, nil, cdbm.NVLinkInterfaceFilterInput{InstanceIDs: []uuid.UUID{instance.ID}}, cdbp.PageInput{Limit: cutil.GetPtr(cdbp.TotalLimit)}, nil)
 		if err != nil {
 			logger.Error().Err(err).Msg("error retrieving NVLink Interfaces from DB for Instance")
 			return cutil.NewAPIErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve NVLink Interfaces for Instance", nil)
 		}
 
 		if len(nvlIfcs) > 0 {
-			return cutil.NewAPIErrorResponse(c, http.StatusBadRequest, defaultNVLinkUpdateError, nil)
+			if !matchesNVLinkAssignments(apiRequest.NVLinkInterfaces, nvlIfcs) {
+				return cutil.NewAPIErrorResponse(c, http.StatusBadRequest, defaultNVLinkUpdateError, nil)
+			}
+			nvLinkAssignmentsToValidate = nil
 		}
 	}
 
 	// Collect all NVLink Logical Partition IDs for batch query
 	nvllpIDs := []uuid.UUID{}
-	for _, nvlifc := range apiRequest.NVLinkInterfaces {
+	for _, nvlifc := range nvLinkAssignmentsToValidate {
 		nvllpID, err := uuid.Parse(nvlifc.NVLinkLogicalPartitionID)
 		if err != nil {
 			logger.Warn().Err(err).Msg("error parsing NVLink Logical Partition id in instance NVLink Interface request")
@@ -3515,7 +3540,7 @@ func (uih UpdateInstanceHandler) Handle(c echo.Context) error {
 	}
 
 	// Validate each NVLink Logical Partition
-	for _, nvlifc := range apiRequest.NVLinkInterfaces {
+	for _, nvlifc := range nvLinkAssignmentsToValidate {
 		nvllpID := uuid.MustParse(nvlifc.NVLinkLogicalPartitionID)
 
 		nvllp, ok := nvllpIDMap[nvllpID]
@@ -3541,7 +3566,7 @@ func (uih UpdateInstanceHandler) Handle(c echo.Context) error {
 	}
 
 	// Validate NVLink interfaces if Instance Type has NVLink (GPU) Capability
-	if len(apiRequest.NVLinkInterfaces) > 0 {
+	if len(nvLinkAssignmentsToValidate) > 0 {
 		var nvlCapCount int
 		var nvlCaps []cdbm.MachineCapability
 
@@ -4335,12 +4360,13 @@ func (uih UpdateInstanceHandler) Handle(c echo.Context) error {
 			return cutil.NewAPIError(http.StatusInternalServerError, "Failed to retrieve NVLink interfaces for Instance, DB error", nil)
 		}
 
-		if apiRequest.NVLinkInterfaces != nil {
-			// Another PATCH may have committed the first binding since validation.
-			// The instance update in this transaction serializes competing PATCHes.
-			if vpc.NVLinkLogicalPartitionID != nil && len(newOrExistingNvlIfcs) > 0 {
+		if checkDefaultNVLink && (nvLinkAssignmentsToValidate == nil || len(newOrExistingNvlIfcs) > 0) {
+			// Recheck under the instance lock in case another PATCH changed the bindings.
+			// A protected match keeps every row, including Error and stale Pending rows.
+			if !matchesNVLinkAssignments(apiRequest.NVLinkInterfaces, newOrExistingNvlIfcs) {
 				return cutil.NewAPIError(http.StatusBadRequest, defaultNVLinkUpdateError, nil)
 			}
+		} else if apiRequest.NVLinkInterfaces != nil {
 			type binding struct {
 				partitionID    uuid.UUID
 				deviceInstance int

@@ -27302,7 +27302,9 @@ components:
             set of GPU assignments, removing any omitted GPUs. An empty list clears all assignments.
             Each GPU index (`deviceInstance`) may select a different NVLink Logical Partition.
             If the VPC has a default NVLink Logical Partition and the Instance already has NVLink
-            Interfaces, providing any list (including an empty list) returns HTTP 400.
+            Interfaces, the list must match the existing GPU index and partition ID pairs in any order.
+            PATCH ignores interfaces in Deleting status when comparing assignments and preserves matching
+            interfaces without retrying them. Adding, removing, or reassigning a GPU returns HTTP 400.
           items:
             $ref: '#/components/schemas/NVLinkInterfaceCreateOrUpdateRequest'
         dpuExtensionServiceDeployments:

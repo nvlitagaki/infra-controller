@@ -5410,6 +5410,19 @@ func TestUpdateInstanceHandler_Handle(t *testing.T) {
 		defaultBindings = append(defaultBindings, row)
 	}
 
+	replayInstance := testInstanceBuildInstance(t, dbSession, "nvlink-default-replay", tn1.ID, ip.ID, st3.ID, &ist4.ID, defaultVPC.ID, &mc5.ID, &os2.ID, nil, cdbm.InstanceStatusReady)
+	replayBindings := []*cdbm.NVLinkInterface{
+		testInstanceBuildInstanceNVLinkInterface(t, dbSession, st3.ID, replayInstance.ID, nvllp1.ID, nil, nil, 0, cdbm.NVLinkInterfaceStatusPending),
+		testInstanceBuildInstanceNVLinkInterface(t, dbSession, st3.ID, replayInstance.ID, nvllp1.ID, nil, nil, 1, cdbm.NVLinkInterfaceStatusError),
+		testInstanceBuildInstanceNVLinkInterface(t, dbSession, st3.ID, replayInstance.ID, nvllp2.ID, nil, nil, 0, cdbm.NVLinkInterfaceStatusDeleting),
+	}
+	replayUpdated := time.Now().UTC().Add(-2 * time.Minute).Truncate(time.Microsecond)
+	_, replayErr := dbSession.DB.Exec("UPDATE nvlink_interface SET updated = ? WHERE instance_id = ?", replayUpdated, replayInstance.ID)
+	require.NoError(t, replayErr)
+
+	retiredInstance := testInstanceBuildInstance(t, dbSession, "nvlink-default-retired", tn1.ID, ip.ID, st3.ID, &ist4.ID, defaultVPC.ID, &mc5.ID, &os2.ID, nil, cdbm.InstanceStatusReady)
+	retiredBinding := testInstanceBuildInstanceNVLinkInterface(t, dbSession, st3.ID, retiredInstance.ID, nvllp1.ID, nil, nil, 0, cdbm.NVLinkInterfaceStatusDeleting)
+
 	instnvlifc1 := testInstanceBuildInstanceNVLinkInterface(t, dbSession, st3.ID, inst13.ID, nvllp1.ID, cutil.GetPtr(uuid.New()), cutil.GetPtr("NVIDIA GB200"), 0, cdbm.NVLinkInterfaceStatusReady)
 	assert.NotNil(t, instnvlifc1)
 
@@ -8442,6 +8455,75 @@ func TestUpdateInstanceHandler_Handle(t *testing.T) {
 					}))
 				},
 			},
+		},
+		{
+			name:   "preserve reordered VPC-default NVLink bindings including stale Pending and Error",
+			fields: fields{dbSession: dbSession, tc: tc, scp: scp, cfg: cfg},
+			args: args{
+				reqData: &model.APIInstanceUpdateRequest{
+					IpxeScript:       os2.IpxeScript,
+					NVLinkInterfaces: []model.APINVLinkInterfaceCreateOrUpdateRequest{existingNVLinkBindings[1], existingNVLinkBindings[0]},
+				},
+				reqInstance:                  replayInstance.ID.String(),
+				reqOrg:                       tnOrg1,
+				reqUser:                      tnu1,
+				respCode:                     http.StatusOK,
+				retainedNVLinkInterfaces:     replayBindings,
+				expectedSiteNVLinkInterfaces: existingNVLinkBindings[:2],
+				afterHandle: func(t *testing.T) {
+					rows, _, err := cdbm.NewNVLinkInterfaceDAO(dbSession).GetAll(ctx, nil, cdbm.NVLinkInterfaceFilterInput{InstanceIDs: []uuid.UUID{replayInstance.ID}}, cdbp.PageInput{}, nil)
+					require.NoError(t, err)
+					require.Len(t, rows, len(replayBindings))
+					for _, row := range rows {
+						assert.True(t, replayUpdated.Equal(row.Updated), "binding %s was updated", row.ID)
+					}
+				},
+			},
+			verifySiteControllerRequest: true,
+		},
+		{
+			name:   "reject a VPC-default NVLink partition change with the same GPU indices",
+			fields: fields{dbSession: dbSession, tc: tc, scp: scp, cfg: cfg},
+			args: args{
+				reqData: &model.APIInstanceUpdateRequest{
+					IpxeScript: os2.IpxeScript,
+					NVLinkInterfaces: []model.APINVLinkInterfaceCreateOrUpdateRequest{
+						{NVLinkLogicalPartitionID: nvllp2.ID.String(), DeviceInstance: 0}, existingNVLinkBindings[1],
+					},
+				},
+				reqInstance: defaultInstance.ID.String(),
+				reqOrg:      tnOrg1,
+				reqUser:     tnu1,
+				respCode:    http.StatusBadRequest,
+				respMessage: cutil.GetPtr("Cannot update NVLink Interfaces if VPC has default NVLink Logical Partition"),
+			},
+		},
+		{
+			name:   "reject an extra GPU in VPC-default NVLink assignments",
+			fields: fields{dbSession: dbSession, tc: tc, scp: scp, cfg: cfg},
+			args: args{
+				reqData:     &model.APIInstanceUpdateRequest{IpxeScript: os2.IpxeScript, NVLinkInterfaces: existingNVLinkBindings[:3]},
+				reqInstance: defaultInstance.ID.String(),
+				reqOrg:      tnOrg1,
+				reqUser:     tnu1,
+				respCode:    http.StatusBadRequest,
+				respMessage: cutil.GetPtr("Cannot update NVLink Interfaces if VPC has default NVLink Logical Partition"),
+			},
+		},
+		{
+			name:   "allow an empty VPC-default NVLink list when only Deleting bindings remain",
+			fields: fields{dbSession: dbSession, tc: tc, scp: scp, cfg: cfg},
+			args: args{
+				reqData: &model.APIInstanceUpdateRequest{
+					IpxeScript: os2.IpxeScript, NVLinkInterfaces: []model.APINVLinkInterfaceCreateOrUpdateRequest{},
+				},
+				reqInstance:              retiredInstance.ID.String(),
+				reqOrg:                   tnOrg1,
+				reqUser:                  tnu1,
+				respCode:                 http.StatusOK,
+				retainedNVLinkInterfaces: []*cdbm.NVLinkInterface{retiredBinding},
+			},
+			verifySiteControllerRequest: true,
 		},
 		{
 			name:   "allow an empty NVLink list in a VPC with a default partition before the first binding",

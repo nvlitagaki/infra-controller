@@ -80,7 +80,7 @@ If a NICo user wants to update an Instance to change NVLink Logical Partition as
 
 The user can specify the NVLink Logical Partition ID for each GPU in the Instance by passing the `nvLinkInterfaces` list.
 
-If Instance's VPC has a default NVLink Logical Partition, no changes to the NVLink Logical Partition assignment are allowed.
+If the Instance's VPC has a default NVLink Logical Partition and the Instance already has NVLink Interfaces, you can omit `nvLinkInterfaces` or send the same GPU indices and partition IDs in any order. PATCH ignores interfaces in `Deleting` status when comparing assignments and preserves matching interfaces without retrying them. Adding, removing, or reassigning a GPU returns HTTP 400. An empty list succeeds only when there are no remaining assignments.
 
 ### Removing Instances from a Logical Partition
 
@@ -96,14 +96,14 @@ A NICo user can call [`GET /v2/org/{org}/nico/instance/{instance-id}`](api:GET/v
 
 ### Default NVLink Logical Partition for a VPC
 
-**It's an optional default, not a constraint.**
+**The VPC default is optional.**
 VPCs can be created with or without a default NVLink Logical Partition.
 
 It is optional on both `POST .../vpc` (Create VPC) and `PATCH .../vpc/{vpcId}` (Update VPC).
 
 **What setting it on a VPC actually does**
 It's a convenience default for instance creation. When `nvLinkLogicalPartitionId` is set on the VPC, you don't have to specify `nvLinkInterfaces` on `POST .../instance` (Create Instance) or `POST .../instance/batch` (Batch Create Instances) — the API will auto-populate the per-GPU NVLink Interfaces to reference that VPC's NVLink Logical Partition.
-That's the entire effect. It does not reserve or lock the NVLink Logical Partition to the VPC.
+Once an Instance has NVLink Interfaces, an Instance update can repeat its existing GPU assignments in any order.
 
 **No exclusivity between VPCs**
 We intentionally don't restrict an NVLink Logical Partition to a single VPC. The same `nvLinkLogicalPartitionId` may be set on multiple VPCs. This is deliberate, to preserve flexibility in how you plan networking and NVLink partitioning.
@@ -116,7 +116,7 @@ If you want finer control, leave `nvLinkLogicalPartitionId` unset on the VPC and
 | Configuration | Behavior |
 | ------------- | -------- |
 | VPC has `nvLinkLogicalPartitionId`, Instance creation omits `nvLinkInterfaces` | API auto-populates all GPUs to the VPC's NVLink Logical Partition |
-| VPC has `nvLinkLogicalPartitionId`, Instance specifies `nvLinkInterfaces` | Instance-level values must align with VPC's Partition, rendering the specification redundant |
+| VPC has `nvLinkLogicalPartitionId`, Instance creation specifies `nvLinkInterfaces` | Instance-level values must align with VPC's Partition, rendering the specification redundant |
 | VPC doesn't have `nvLinkLogicalPartitionId` set, Instance specifies `nvLinkInterfaces` | Per-GPU NVLink Logical Partition assignments are used |
 | Same `nvLinkLogicalPartitionId` on multiple VPCs | Allowed — no implicit exclusivity |
 
