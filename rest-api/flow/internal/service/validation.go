@@ -66,8 +66,8 @@ func (rs *FlowServerImpl) validationCandidates(
 			for _, r := range racks {
 				rackComponents = append(rackComponents, extractComponentsByTypes(r, nil)...)
 			}
-			page.Offset += len(racks)
-			if len(racks) == 0 || page.Offset >= int(total) {
+			page.Offset += int64(len(racks))
+			if len(racks) == 0 || page.Offset >= int64(total) {
 				break
 			}
 		}
@@ -99,8 +99,8 @@ func (rs *FlowServerImpl) validationCandidates(
 			return nil, err
 		}
 		candidates = append(candidates, components...)
-		page.Offset += len(components)
-		if len(components) == 0 || page.Offset >= int(total) {
+		page.Offset += int64(len(components))
+		if len(components) == 0 || page.Offset >= int64(total) {
 			break
 		}
 	}

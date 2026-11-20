@@ -1413,10 +1413,10 @@ func (rs *FlowServerImpl) ListOperationRules(
 		Limit:  100,
 	}
 	if req.Offset != nil {
-		pagination.Offset = int(req.GetOffset())
+		pagination.Offset = int64(req.GetOffset())
 	}
 	if req.Limit != nil {
-		pagination.Limit = int(req.GetLimit())
+		pagination.Limit = int64(req.GetLimit())
 	}
 
 	rules, total, err := rs.taskStore.ListRules(ctx, options, pagination)
@@ -1738,8 +1738,8 @@ func (rs *FlowServerImpl) GetComponents(
 
 		// Apply pagination
 		total = int32(len(filteredComponents))
-		start := pg.Offset
-		end := start + pg.Limit
+		start := int(pg.Offset)
+		end := start + int(pg.Limit)
 		if start > len(filteredComponents) {
 			components = []*component.Component{}
 		} else if end > len(filteredComponents) {
@@ -1987,8 +1987,8 @@ func (rs *FlowServerImpl) ValidateComponents(
 
 	// Apply pagination to diffs
 	totalDiffs := int32(len(diffs))
-	start := pg.Offset
-	end := start + pg.Limit
+	start := int(pg.Offset)
+	end := start + int(pg.Limit)
 	if start > len(diffs) {
 		diffs = []*pb.ComponentDiff{}
 	} else if end > len(diffs) {

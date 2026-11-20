@@ -431,12 +431,12 @@ func (asd AllocationSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter Alloca
 		return nil, 0, err
 	}
 
-	err = allocationPaginator.Query.Limit(int64(allocationPaginator.Limit)).Offset(int64(allocationPaginator.Offset)).Scan(ctx)
+	err = allocationPaginator.Query.Limit(allocationPaginator.Limit).Offset(allocationPaginator.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return allocations, allocationPaginator.Total, nil
+	return allocations, int(allocationPaginator.Total), nil
 
 }
 

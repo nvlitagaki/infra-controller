@@ -16,10 +16,12 @@ import (
 func TestNew(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		total int
+		total int64
+		count int64
 	}{
-		{name: "count matching rows"},
-		{name: "reuse supplied total", total: 3},
+		{name: "count matching rows", count: 3},
+		{name: "reuse supplied total", total: 3, count: 3},
+		{name: "count exceeds int32", count: 1 << 33},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
@@ -34,7 +36,7 @@ func TestNew(t *testing.T) {
 			var rows []row
 			if tc.total == 0 {
 				mock.ExpectQuery(`SELECT count(*) FROM "query_test" AS "qt"`).
-					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(3)))
+					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.count))
 			}
 			mock.ExpectQuery(`SELECT "qt"."id" FROM "query_test" AS "qt" ORDER BY "id" ASC LIMIT 2 OFFSET 1`).
 				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2).AddRow(3))
@@ -46,7 +48,7 @@ func TestNew(t *testing.T) {
 				DefaultOrderBy: []OrderBy{{Column: "id", Direction: OrderAscending}},
 			})
 			require.NoError(t, err)
-			assert.Equal(t, 3, query.TotalCount())
+			assert.Equal(t, tc.count, query.TotalCount())
 			err = query.Scan(t.Context())
 			require.NoError(t, err)
 			require.Len(t, rows, 2)

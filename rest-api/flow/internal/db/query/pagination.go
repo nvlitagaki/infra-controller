@@ -17,9 +17,9 @@ type OrderDirection string
 const DefaultPaginationLimit = 100
 
 type Pagination struct {
-	Offset int `json:"offset"`
-	Limit  int `json:"limit"`
-	Total  int `json:"total"`
+	Offset int64 `json:"offset"`
+	Limit  int64 `json:"limit"`
+	Total  int64 `json:"total"`
 }
 
 // DefaultPagination returns a Pagination with offset 0 and the default limit.

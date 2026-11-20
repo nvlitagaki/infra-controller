@@ -1827,3 +1827,29 @@ func TestQueueOptionsFrom(t *testing.T) {
 		require.Equal(t, operation.ConflictStrategyReject, strategy)
 	})
 }
+
+func TestPaginationFrom(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input *pb.Pagination
+		want  *dbquery.Pagination
+	}{
+		{
+			name: "omitted pagination uses defaults",
+			want: &dbquery.Pagination{Limit: dbquery.DefaultPaginationLimit},
+		},
+		{
+			name:  "preserves maximum protobuf offset",
+			input: &pb.Pagination{Offset: 1<<31 - 1, Limit: 100},
+			want:  &dbquery.Pagination{Offset: 1<<31 - 1, Limit: 100},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := PaginationFrom(tc.input)
+			require.Equal(t, tc.want, got)
+			roundTrip := PaginationTo(got)
+			require.Equal(t, int32(tc.want.Offset), roundTrip.Offset)
+			require.Equal(t, int32(tc.want.Limit), roundTrip.Limit)
+		})
+	}
+}

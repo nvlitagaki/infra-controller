@@ -323,8 +323,8 @@ func PaginationFrom(pg *pb.Pagination) *dbquery.Pagination {
 	}
 
 	return &dbquery.Pagination{
-		Offset: int(pg.GetOffset()),
-		Limit:  int(pg.GetLimit()),
+		Offset: int64(pg.GetOffset()),
+		Limit:  int64(pg.GetLimit()),
 	}
 }
 

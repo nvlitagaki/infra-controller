@@ -376,12 +376,12 @@ func (ssd SkuSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter SkuFilterInpu
 		return nil, 0, err
 	}
 
-	err = pager.Query.Limit(int64(pager.Limit)).Offset(int64(pager.Offset)).Scan(ctx)
+	err = pager.Query.Limit(pager.Limit).Offset(pager.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return skus, pager.Total, nil
+	return skus, int(pager.Total), nil
 }
 
 // Update writes supplied fields and stamps `Updated`, checking `ExpectedUpdated`

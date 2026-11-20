@@ -218,12 +218,12 @@ func (skgiasd SSHKeyGroupInstanceAssociationSQLDAO) GetAll(ctx context.Context, 
 		return nil, 0, err
 	}
 
-	err = paginator.Query.Limit(int64(paginator.Limit)).Offset(int64(paginator.Offset)).Scan(ctx)
+	err = paginator.Query.Limit(paginator.Limit).Offset(paginator.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return skgias, paginator.Total, nil
+	return skgias, int(paginator.Total), nil
 }
 
 // Update updates specified fields of an existing SSHKeyGroupInstanceAssociation

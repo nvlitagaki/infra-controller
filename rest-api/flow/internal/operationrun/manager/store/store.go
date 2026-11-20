@@ -178,7 +178,7 @@ func (s *PostgresStore) List(
 	).
 		OrderExpr("orun.created_at DESC, orun.id DESC")
 	if opts.Pagination != nil {
-		q = q.Offset(int64(opts.Pagination.Offset)).Limit(int64(opts.Pagination.Limit))
+		q = q.Offset(opts.Pagination.Offset).Limit(opts.Pagination.Limit)
 	}
 
 	if err := q.Scan(ctx); err != nil {
@@ -255,7 +255,7 @@ func (s *PostgresStore) ListTargets(
 
 	q = q.OrderExpr("ort.phase_index ASC, ort.sequence_index ASC")
 	if opts.Pagination != nil {
-		q = q.Offset(int64(opts.Pagination.Offset)).Limit(int64(opts.Pagination.Limit))
+		q = q.Offset(opts.Pagination.Offset).Limit(opts.Pagination.Limit)
 	}
 
 	if err := q.Scan(ctx); err != nil {

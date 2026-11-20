@@ -84,7 +84,7 @@ func TestGetListOfRacks(t *testing.T) {
 			for page := range (len(racks) + tc.pageSize - 1) / tc.pageSize {
 				got, total, err := model.GetListOfRacks(
 					ctx, pool.DB, dbquery.StringQueryInfo{}, nil, nil,
-					&dbquery.Pagination{Offset: page * tc.pageSize, Limit: tc.pageSize},
+					&dbquery.Pagination{Offset: int64(page * tc.pageSize), Limit: int64(tc.pageSize)},
 					orderBy, false, false,
 				)
 				require.NoError(t, err)

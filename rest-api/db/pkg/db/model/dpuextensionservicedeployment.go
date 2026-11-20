@@ -283,12 +283,12 @@ func (desdsd DpuExtensionServiceDeploymentSQLDAO) GetAll(ctx context.Context, tx
 		return nil, 0, err
 	}
 
-	err = paginatorObj.Query.Limit(int64(paginatorObj.Limit)).Offset(int64(paginatorObj.Offset)).Scan(ctx)
+	err = paginatorObj.Query.Limit(paginatorObj.Limit).Offset(paginatorObj.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return desds, paginatorObj.Total, nil
+	return desds, int(paginatorObj.Total), nil
 }
 
 // Update updates specified fields of an existing DpuExtensionServiceDeployment

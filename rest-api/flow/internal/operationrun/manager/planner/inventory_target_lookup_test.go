@@ -340,7 +340,7 @@ func TestInventoryTargetLookupTargetsFromDefaultScopeRejectsLimitOverflow(t *tes
 
 	require.ErrorContains(t, err, "candidate scope exceeds target limit 1")
 	require.Len(t, inventory.paginations, 1)
-	require.Equal(t, 2, inventory.paginations[0].Limit)
+	require.Equal(t, int64(2), inventory.paginations[0].Limit)
 }
 
 func TestInventoryTargetLookupTargetsFromDefaultScopeLimitsFilteredTargets(t *testing.T) {
@@ -507,8 +507,8 @@ func (s *fakeInventoryTargetSource) GetListOfRacks(
 
 	racks := s.racks
 	if pagination != nil {
-		start := min(pagination.Offset, len(racks))
-		end := min(start+pagination.Limit, len(racks))
+		start := min(pagination.Offset, int64(len(racks)))
+		end := min(start+pagination.Limit, int64(len(racks)))
 		racks = racks[start:end]
 	}
 

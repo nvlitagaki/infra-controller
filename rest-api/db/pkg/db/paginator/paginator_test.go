@@ -85,7 +85,7 @@ func TestNewPaginator(t *testing.T) {
 				query: query,
 			},
 			want: &Paginator{
-				Total:  totalCount,
+				Total:  int64(totalCount),
 				Offset: DefaultOffset,
 				Limit:  DefaultLimit,
 				Query:  query,
@@ -101,7 +101,7 @@ func TestNewPaginator(t *testing.T) {
 				query:  query,
 			},
 			want: &Paginator{
-				Total:  totalCount,
+				Total:  int64(totalCount),
 				Offset: DefaultOffset,
 				Limit:  DefaultLimit,
 				Query:  query,
@@ -118,7 +118,7 @@ func TestNewPaginator(t *testing.T) {
 				orderBy: []*OrderBy{&orderBy},
 			},
 			want: &Paginator{
-				Total:  totalCount,
+				Total:  int64(totalCount),
 				Offset: 10,
 				Limit:  30,
 				Query:  query.Order(orderBy.Order + " " + orderBy.Field),
@@ -133,9 +133,9 @@ func TestNewPaginator(t *testing.T) {
 				limit: cutil.GetPtr(TotalLimit),
 			},
 			want: &Paginator{
-				Total:  totalCount,
+				Total:  int64(totalCount),
 				Offset: DefaultOffset,
-				Limit:  totalCount,
+				Limit:  int64(totalCount),
 			},
 			wantErr: false,
 		},
@@ -170,4 +170,30 @@ func TestNewPaginatorCountErrorPreservesCause(t *testing.T) {
 	require.ErrorIs(t, err, countCause)
 	assert.Nil(t, got)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestNewPaginatorMultiOrderBy(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		total int64
+	}{
+		{name: "empty result"},
+		{name: "count exceeds int32", total: 1 << 33},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sqlDB, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			bunDB := bun.NewDB(sqlDB, pgdialect.New())
+			t.Cleanup(func() { _ = bunDB.Close() })
+			mock.ExpectQuery(`SELECT count\(\*\) FROM "site" AS "tm"`).
+				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.total))
+
+			got, err := NewPaginatorMultiOrderBy(t.Context(), bunDB.NewSelect().Model((*TestModel)(nil)), nil, cutil.GetPtr(TotalLimit), nil, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tc.total, got.Total)
+			assert.Equal(t, tc.total, got.Limit)
+			assert.Equal(t, int64(0), got.Offset)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }

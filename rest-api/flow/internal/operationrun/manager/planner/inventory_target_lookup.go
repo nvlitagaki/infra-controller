@@ -85,8 +85,8 @@ func (l *InventoryTargetLookup) TargetsFromDefaultScope(
 			nil,
 			nil,
 			&dbquery.Pagination{
-				Offset: offset,
-				Limit:  pageSize,
+				Offset: int64(offset),
+				Limit:  int64(pageSize),
 			},
 			nil,
 			true,

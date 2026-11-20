@@ -304,12 +304,12 @@ func (usd UserSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter UserFilterIn
 		return nil, 0, err
 	}
 
-	err = paginator.Query.Limit(int64(paginator.Limit)).Offset(int64(paginator.Offset)).Scan(ctx)
+	err = paginator.Query.Limit(paginator.Limit).Offset(paginator.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return users, paginator.Total, nil
+	return users, int(paginator.Total), nil
 }
 
 // Create creates a new user from the given input

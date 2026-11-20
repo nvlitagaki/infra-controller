@@ -702,12 +702,12 @@ func (isd InstanceSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter Instance
 		return nil, 0, err
 	}
 
-	err = paginator.Query.Limit(int64(paginator.Limit)).Offset(int64(paginator.Offset)).Scan(ctx)
+	err = paginator.Query.Limit(paginator.Limit).Offset(paginator.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return instances, paginator.Total, nil
+	return instances, int(paginator.Total), nil
 }
 
 // GetAllIDs returns the IDs of all Instances matching the filter, ordered by ID

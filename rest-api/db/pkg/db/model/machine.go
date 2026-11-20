@@ -783,12 +783,12 @@ func (msd MachineSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter MachineFi
 		return nil, 0, err
 	}
 
-	err = machinePaginator.Query.Limit(int64(machinePaginator.Limit)).Offset(int64(machinePaginator.Offset)).Scan(ctx)
+	err = machinePaginator.Query.Limit(machinePaginator.Limit).Offset(machinePaginator.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return machines, machinePaginator.Total, nil
+	return machines, int(machinePaginator.Total), nil
 }
 
 // GetAllIDs returns the IDs of all Machines matching the filter, ordered by ID
@@ -859,11 +859,11 @@ func (msd MachineSQLDAO) GetDistinctLabelKeys(ctx context.Context, tx *db.Tx, fi
 		return nil, 0, err
 	}
 
-	err = labelPaginator.Query.Limit(int64(labelPaginator.Limit)).Offset(int64(labelPaginator.Offset)).Scan(ctx, &keys)
+	err = labelPaginator.Query.Limit(labelPaginator.Limit).Offset(labelPaginator.Offset).Scan(ctx, &keys)
 	if err != nil {
 		return nil, 0, err
 	}
-	return keys, labelPaginator.Total, nil
+	return keys, int(labelPaginator.Total), nil
 }
 
 // GetDistinctLabelValues returns paginated, distinct Machine label values for a label key.
@@ -901,11 +901,11 @@ func (msd MachineSQLDAO) GetDistinctLabelValues(ctx context.Context, tx *db.Tx, 
 		return nil, 0, err
 	}
 
-	err = labelPaginator.Query.Limit(int64(labelPaginator.Limit)).Offset(int64(labelPaginator.Offset)).Scan(ctx, &values)
+	err = labelPaginator.Query.Limit(labelPaginator.Limit).Offset(labelPaginator.Offset).Scan(ctx, &values)
 	if err != nil {
 		return nil, 0, err
 	}
-	return values, labelPaginator.Total, nil
+	return values, int(labelPaginator.Total), nil
 }
 
 // Update updates specified fields of an existing Machine

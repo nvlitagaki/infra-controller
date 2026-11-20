@@ -168,12 +168,12 @@ func TestFlowServerImpl_ValidateComponents(t *testing.T) {
 			calls := 0
 			mgr.listRacks = func(_ dbquery.StringQueryInfo, _, _ *dbquery.StringQueryInfo, page *dbquery.Pagination, _, _ bool) ([]*rack.Rack, int32, error) {
 				calls++
-				end := min(page.Offset+page.Limit, len(racks))
+				end := min(page.Offset+page.Limit, int64(len(racks)))
 				return racks[page.Offset:end], int32(len(racks)), nil
 			}
 			mgr.listComponents = func(page *dbquery.Pagination) ([]*component.Component, int32, error) {
 				calls++
-				end := min(page.Offset+page.Limit, len(components))
+				end := min(page.Offset+page.Limit, int64(len(components)))
 				return components[page.Offset:end], int32(len(components)), nil
 			}
 			filter := componentFilter(pb.ComponentFilterField_COMPONENT_FILTER_FIELD_NAME, "selected")

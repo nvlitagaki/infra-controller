@@ -77,9 +77,9 @@ type PageInput struct {
 
 // Paginator is a helper struct for paginating query results
 type Paginator struct {
-	Total  int
-	Offset int
-	Limit  int
+	Total  int64
+	Offset int64
+	Limit  int64
 	Query  *bun.SelectQuery
 }
 
@@ -123,19 +123,19 @@ func NewPaginatorMultiOrderBy(ctx context.Context, query *bun.SelectQuery, offse
 		return nil, fmt.Errorf("%w: %w", ErrQueryTotalCount, err)
 	}
 
-	paginator.Total = int(total)
+	paginator.Total = total
 
 	if offset != nil {
-		paginator.Offset = *offset
+		paginator.Offset = int64(*offset)
 		if *offset < 0 {
 			paginator.Offset = 0
 		}
 	}
 
 	if limit != nil {
-		paginator.Limit = *limit
+		paginator.Limit = int64(*limit)
 		if *limit == TotalLimit {
-			paginator.Limit = int(total)
+			paginator.Limit = total
 		} else if *limit < 0 {
 			paginator.Limit = DefaultLimit
 		}

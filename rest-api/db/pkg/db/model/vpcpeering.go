@@ -316,12 +316,12 @@ func (vpsd VpcPeeringSQLDAO) GetAll(
 		return nil, 0, err
 	}
 
-	err = paginator.Query.Limit(int64(paginator.Limit)).Offset(int64(paginator.Offset)).Scan(ctx)
+	err = paginator.Query.Limit(paginator.Limit).Offset(paginator.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return vps, paginator.Total, nil
+	return vps, int(paginator.Total), nil
 }
 
 func (vpsd VpcPeeringSQLDAO) setQueryWithFilter(filter VpcPeeringFilterInput, query *bun.SelectQuery, vpDAOSpan otrace.Span) (*bun.SelectQuery, error) {

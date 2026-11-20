@@ -55,7 +55,7 @@ func TestNullableDomainNameMigration(t *testing.T) {
 	require.NoError(t, session.DB.NewRaw("SELECT count(*) FROM nvldomain WHERE name IS NULL").Scan(ctx, &unnamed))
 	require.Equal(t, 2, unnamed)
 	for offset := range 3 {
-		rows, total, err := model.GetListOfNVLDomains(ctx, session.DB, dbquery.StringQueryInfo{}, &dbquery.Pagination{Offset: offset, Limit: 1}, nvldomain.ListOptions{ExternalOnly: true})
+		rows, total, err := model.GetListOfNVLDomains(ctx, session.DB, dbquery.StringQueryInfo{}, &dbquery.Pagination{Offset: int64(offset), Limit: 1}, nvldomain.ListOptions{ExternalOnly: true})
 		require.NoError(t, err)
 		require.EqualValues(t, 2, total)
 		if offset == len(ids) {

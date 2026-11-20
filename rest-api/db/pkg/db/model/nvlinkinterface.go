@@ -266,12 +266,12 @@ func (nvlisd NVLinkInterfaceSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filte
 		return nil, 0, err
 	}
 
-	err = paginator.Query.Limit(int64(paginator.Limit)).Offset(int64(paginator.Offset)).Scan(ctx)
+	err = paginator.Query.Limit(paginator.Limit).Offset(paginator.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return nvlis, paginator.Total, nil
+	return nvlis, int(paginator.Total), nil
 }
 
 // Create creates a new NVLinkInterface from the given parameters

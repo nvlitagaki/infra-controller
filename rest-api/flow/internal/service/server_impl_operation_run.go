@@ -251,7 +251,7 @@ func operationRunStatsForTargets(
 			operationrun.TargetListOptions{
 				PhaseScope: operationrun.TargetPhaseScopeCurrentAndCompletedPhases,
 				Pagination: &dbquery.Pagination{
-					Offset: offset,
+					Offset: int64(offset),
 					Limit:  dbquery.DefaultPaginationLimit,
 				},
 			},

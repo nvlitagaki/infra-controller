@@ -79,8 +79,8 @@ func EventRuleListRequestFrom(
 	convertedPagination := PaginationFrom(pagination)
 	request := eventrule.RuleListRequest{
 		Filter: filter,
-		Offset: convertedPagination.Offset,
-		Limit:  convertedPagination.Limit,
+		Offset: int(convertedPagination.Offset),
+		Limit:  int(convertedPagination.Limit),
 	}
 	if err := request.Validate(); err != nil {
 		return eventrule.RuleListRequest{}, err

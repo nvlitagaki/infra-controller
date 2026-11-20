@@ -435,12 +435,12 @@ func (tasd TenantAccountSQLDAO) GetAll(ctx context.Context, tx *db.Tx, filter Te
 		return nil, 0, err
 	}
 
-	err = newPaginator.Query.Limit(int64(newPaginator.Limit)).Offset(int64(newPaginator.Offset)).Scan(ctx)
+	err = newPaginator.Query.Limit(newPaginator.Limit).Offset(newPaginator.Offset).Scan(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return tas, newPaginator.Total, nil
+	return tas, int(newPaginator.Total), nil
 }
 
 // Create creates a new TenantAccount from the given parameters

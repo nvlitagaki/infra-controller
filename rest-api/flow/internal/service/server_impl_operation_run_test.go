@@ -679,13 +679,13 @@ func (m *mockOperationRunManager) ListTargets(
 	targets := m.listTargets
 	if m.pageListTargets && opts.Pagination != nil {
 		offset := opts.Pagination.Offset
-		if offset >= len(targets) {
+		if offset >= int64(len(targets)) {
 			return nil, m.listTargetsTotal, nil
 		}
 
 		end := offset + opts.Pagination.Limit
-		if end > len(targets) {
-			end = len(targets)
+		if end > int64(len(targets)) {
+			end = int64(len(targets))
 		}
 		targets = targets[offset:end]
 	}

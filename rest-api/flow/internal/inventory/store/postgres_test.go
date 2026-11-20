@@ -850,7 +850,7 @@ func TestPostgresStore_GetListOfRacks(t *testing.T) {
 		{name: "past final domain page", offset: 2, externalOnly: true, total: 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, total, err := store.GetListOfRacks(ctx, dbquery.StringQueryInfo{}, nil, nil, &dbquery.Pagination{Offset: tc.offset, Limit: 1}, nil, false, tc.externalOnly)
+			got, total, err := store.GetListOfRacks(ctx, dbquery.StringQueryInfo{}, nil, nil, &dbquery.Pagination{Offset: int64(tc.offset), Limit: 1}, nil, false, tc.externalOnly)
 			require.NoError(t, err)
 			assert.Equal(t, tc.total, total)
 			if tc.offset == 2 {
